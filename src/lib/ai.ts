@@ -2,6 +2,7 @@ import { audit, js, nowIso, one, rows, uuid, type Db } from "./db";
 import { getAvailability, listServices } from "./booking";
 import { formatLocal, localParts, weekdayOfLocalDate } from "./tz";
 import { matchArticle } from "./library";
+import { runLlm, buildSystemPrompt, answerIsSafe, HANDOFF_TOKEN, type ChatMsg } from "./llm";
 
 export type Locale = "en" | "ru" | "uk";
 export type Intent = "medical" | "human" | "booking" | "price" | "technique" | "extensions" | "consultation" | "preparation" | "greeting" | "contact" | "education" | "unknown";
@@ -13,7 +14,7 @@ export type AiReply = {
   requiresHuman: boolean; handoffId?: string;
   toolResults: { tool: string; ok: boolean; detail?: string }[];
   // Честная маркировка: это сценарный движок на утверждённых карточках, НЕ языковая модель.
-  engine: "scripted-demo";
+  engine: "scripted-demo" | "llm-demo";
 };
 
 /* ---------- язык ---------- */
@@ -133,7 +134,7 @@ async function handoff(db: Db, tenantId: string, conversationId: string, reason:
   return hid;
 }
 
-export async function handleMessage(db: Db, p: { tenantId: string; conversationId: string; text: string; localeHint: Locale; now?: Date }): Promise<AiReply> {
+export async function handleMessage(db: Db, p: { tenantId: string; conversationId: string; text: string; localeHint: Locale; now?: Date; llm?: (m: ChatMsg[]) => Promise<string | null> }): Promise<AiReply> {
   const conv = await one<{ id: string; locale: string }>(db, "SELECT id,locale FROM conversations WHERE id=?1 AND tenant_id=?2", [p.conversationId, p.tenantId]);
   if (!conv) throw new Error("conversation not found");
   const text = p.text.trim().slice(0, 1000);
@@ -148,13 +149,26 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
   let slots: AiReply["slots"];
   let articles: AiReply["articles"];
   let requiresHuman = false;
+  let engine: AiReply["engine"] = "scripted-demo";
   let handoffId: string | undefined;
 
   await db.run("INSERT INTO messages(id,conversation_id,role,content,created_at) VALUES (?1,?2,'user',?3,?4)", [uuid(), conv.id, text, nowIso()]);
   await db.run("UPDATE conversations SET locale=?2 WHERE id=?1", [conv.id, locale]);
 
   const primary = intents[0];
-  if (primary === "medical" || primary === "human" || primary === "unknown") {
+  // Вопрос вне сценариев: пробуем модель (Cloudflare Workers AI) по утверждённым знаниям; при отказе, сбое или небезопасном ответе — передача мастеру
+  let llmText: string | null = null;
+  if (primary === "unknown") {
+    const hist = await rows<{ role: string; content: string }>(db, "SELECT role,content FROM messages WHERE conversation_id=?1 AND COALESCE(json_extract(meta,'$.kind'),'') <> 'disclosure' ORDER BY rowid DESC LIMIT 8", [conv.id]);
+    const msgs: ChatMsg[] = [{ role: "system", content: buildSystemPrompt(locale) }, ...hist.reverse().map((m) => ({ role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant", content: m.content }))];
+    const out = await (p.llm ?? runLlm)(msgs);
+    if (out && !out.includes(HANDOFF_TOKEN) && answerIsSafe(out)) llmText = out.slice(0, 1200);
+    tools.push({ tool: "llm", ok: !!llmText, detail: llmText ? "answered" : out ? "refused_or_unsafe" : "unavailable" });
+  }
+  if (llmText) {
+    engine = "llm-demo";
+    parts.push(llmText);
+  } else if (primary === "medical" || primary === "human" || primary === "unknown") {
     handoffId = await handoff(db, p.tenantId, conv.id, primary === "medical" ? "medical" : primary === "human" ? "client_requested_human" : "out_of_knowledge", text);
     tools.push({ tool: "requestHandoff", ok: true, detail: handoffId });
     requiresHuman = true;
@@ -219,6 +233,6 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
   }
 
   const message = parts.join("\n\n");
-  await db.run("INSERT INTO messages(id,conversation_id,role,content,knowledge_version,meta,created_at) VALUES (?1,?2,'assistant',?3,?4,?5,?6)", [uuid(), conv.id, message, kbv.version, js({ intents, citations, tools, engine: "scripted-demo" }), nowIso()]);
-  return { message, locale, intent: primary, knowledgeVersion: kbv.version, citations, slots, articles, requiresHuman, handoffId, toolResults: tools, engine: "scripted-demo" };
+  await db.run("INSERT INTO messages(id,conversation_id,role,content,knowledge_version,meta,created_at) VALUES (?1,?2,'assistant',?3,?4,?5,?6)", [uuid(), conv.id, message, kbv.version, js({ intents, citations, tools, engine }), nowIso()]);
+  return { message, locale, intent: primary, knowledgeVersion: kbv.version, citations, slots, articles, requiresHuman, handoffId, toolResults: tools, engine };
 }
