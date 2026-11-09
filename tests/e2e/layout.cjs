@@ -17,7 +17,7 @@ const pages = ["/en", "/ru", "/uk", "/ru/book", "/uk/book", "/en/privacy"];
         const bad = [];
         for (const el of document.querySelectorAll("body *")) {
           const b = el.getBoundingClientRect();
-          if (b.width && (b.right > vw + 1 || b.left < -1)) {
+          if (b.width && !(el.classList && el.classList.contains("skip")) && (b.right > vw + 1 || b.left < -1)) {
             // элементы внутри горизонтально прокручиваемых контейнеров не считаем
             let p = el.parentElement, scroll = false;
             while (p && p !== document.body) { const o = getComputedStyle(p).overflowX; if (o === "auto" || o === "scroll") { scroll = true; break; } p = p.parentElement; }

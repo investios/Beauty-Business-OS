@@ -11,7 +11,7 @@
       "binding": "DB",
       "database_name": "beauty-os",
       // database_id подставляется после `wrangler d1 create beauty-os` (см. docs/DEPLOY_CLOUDFLARE.md)
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "892eb5c2-3031-43f9-b9df-5ac18f39523d",
       "migrations_dir": "migrations"
     }
   ]
