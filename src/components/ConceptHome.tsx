@@ -1,4 +1,5 @@
-import { COPY, CLANGS, THEMES, THEME_NAME, type CLang, type Theme } from "@/lib/concept-copy";
+import { COPY, type CLang, type Theme } from "@/lib/concept-copy";
+import ConceptBar from "./concepts/ConceptBar";
 
 /** Оригинальный декоративный рисунок прядей (не фото работ). Цвет задаётся темой. */
 function Strands() {
@@ -14,23 +15,13 @@ function Strands() {
   );
 }
 
-const href = (lang: CLang, theme: Theme) => `/concepts/${theme}?lang=${lang}`;
-
 export default function ConceptHome({ theme, lang }: { theme: Theme; lang: CLang }) {
   const c = COPY[lang];
   const heroBand = theme === "b" ? "band-light alt" : "band-dark";
   return (
     <div className="concept" data-theme={theme}>
       <a className="skip" href="#main">{c.skip}</a>
-      <div className="strip">
-        <span>{c.strip}</span>
-        <span className="strip-links">
-          <span>{c.variant}:</span>
-          {THEMES.map((t) => <a key={t} href={href(lang, t)} aria-current={t === theme ? "true" : undefined} title={THEME_NAME[t][lang]}>{t.toUpperCase()}</a>)}
-          <span className="sep" aria-hidden="true" />
-          {CLANGS.map((l) => <a key={l} href={href(l, theme)} aria-current={l === lang ? "true" : undefined}>{l === "uk" ? "UA" : l.toUpperCase()}</a>)}
-        </span>
-      </div>
+      <ConceptBar variant={theme} lang={lang} />
       <header className={`site-head ${heroBand}`}>
         <div className="wrap head-in">
           <a className="wordmark" href={`/concepts/${theme}?lang=${lang}`}>MK <span>Extension Studio</span></a>

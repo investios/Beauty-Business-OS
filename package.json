@@ -16,7 +16,12 @@
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.3.0",
+    "@fontsource/jost": "^5.3.0",
+    "@fontsource/literata": "^5.3.0",
     "@fontsource/manrope": "^5.3.0",
+    "@fontsource/onest": "^5.3.1",
+    "@fontsource/prata": "^5.3.0",
+    "@fontsource/unbounded": "^5.3.0",
     "@opennextjs/cloudflare": "^1.20.16",
     "next": "^16.4.5",
     "react": "^19.3.1",

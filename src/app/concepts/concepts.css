@@ -54,11 +54,11 @@ body { margin: 0; }
 .skip:focus { left: 8px; }
 
 /* ---------- примечание о макете ---------- */
-.strip { background: #F2E6B8; color: #2A2410; font: 600 13px/1.4 var(--ui); padding: 8px 20px; display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: space-between; align-items: center; }
+.strip { background: #2B2420; color: #F5EEE6; font: 600 13px/1.4 var(--ui); padding: 8px 20px; display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: space-between; align-items: center; }
 .strip-links { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-.strip-links a { display: inline-grid; place-items: center; min-width: 36px; min-height: 32px; padding: 0 8px; border-radius: 8px; text-decoration: none; color: #2A2410; border: 1px solid #2A241055; font-weight: 700; }
-.strip-links a[aria-current="true"] { background: #2A2410; color: #F2E6B8; border-color: #2A2410; }
-.strip-links .sep { width: 1px; height: 18px; background: #2A241055; margin: 0 6px; }
+.strip-links a { display: inline-grid; place-items: center; min-width: 36px; min-height: 32px; padding: 0 8px; border-radius: 8px; text-decoration: none; color: #F5EEE6; border: 1px solid #F5EEE699; font-weight: 700; }
+.strip-links a[aria-current="true"] { background: #F5EEE6; color: #2B2420; border-color: #F5EEE6; }
+.strip-links .sep { width: 1px; height: 18px; background: #F5EEE666; margin: 0 6px; }
 
 /* ---------- шапка ---------- */
 .site-head { position: sticky; top: 0; z-index: 20; border-bottom: 1px solid var(--line); }

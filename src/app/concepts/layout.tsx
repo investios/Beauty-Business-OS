@@ -5,7 +5,15 @@ import "@fontsource/cormorant-garamond/600-italic.css";
 import "@fontsource/manrope/400.css";
 import "@fontsource/manrope/600.css";
 import "@fontsource/manrope/700.css";
+import "@fontsource/prata/400.css";
+import "@fontsource/onest/400.css";
+import "@fontsource/onest/600.css";
+import "@fontsource/literata/400.css";
+import "@fontsource/jost/300.css";
+import "@fontsource/jost/400.css";
+import "@fontsource/jost/500.css";
 import "./concepts.css";
+import "./concepts-b.css";
 
 export const metadata: Metadata = { title: "Макеты главной страницы · MK Extension Studio", robots: { index: false, follow: false } };
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };

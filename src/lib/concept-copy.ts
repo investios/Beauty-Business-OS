@@ -9,6 +9,12 @@ export const THEME_NAME: Record<Theme, Record<CLang, string>> = {
   b: { en: "Nude & natural", ru: "Нюд и натуральный", uk: "Нюд і натуральний" },
   c: { en: "Burgundy editorial", ru: "Бордо и розовая пудра", uk: "Бордо й рожева пудра" },
 };
+export const VARIANTS = ["a", "b", "c", "b1", "b2", "b3"] as const;
+export type Variant = (typeof VARIANTS)[number];
+export const VARIANT_NAME: Record<Variant, string> = {
+  a: "Графит и шампань", b: "Нюд и натуральный", c: "Бордо и розовая пудра",
+  b1: "B1 Оттенки", b2: "B2 Разговор", b3: "B3 Нить",
+};
 type Card = { id: string; title: string; text: string };
 export type Copy = {
   strip: string; variant: string; skip: string;
