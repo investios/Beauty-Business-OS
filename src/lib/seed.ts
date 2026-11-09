@@ -1,7 +1,4 @@
-import type { PGlite } from "@electric-sql/pglite";
-import { one, rows } from "./db";
-
-type Q = Pick<PGlite, "query">;
+import { js, nowIso, one, rows, uuid, type Db, type Param } from "./db";
 type L3 = { en: string; ru: string; uk: string };
 
 // ВСЕ значения ниже — заглушки для демонстрации (is_placeholder=true), НЕ факты мастера.
@@ -94,49 +91,45 @@ const ARTICLES: Art[] = [
   },
 ];
 
-export async function createTenant(db: Q, opts: { slug: string; name: string; isDemo?: boolean }) {
-  const t = await one<{ id: string }>(db, "INSERT INTO tenants(slug,name,default_locale,is_demo) VALUES ($1,$2,'en',$3) RETURNING id", [opts.slug, opts.name, opts.isDemo ?? true]);
-  const tenantId = t!.id;
-
-  const staff = await one<{ id: string }>(db, "INSERT INTO staff(tenant_id,name) VALUES ($1,$2) RETURNING id", [tenantId, "Specialist"]);
+export async function createTenant(db: Db, opts: { slug: string; name: string; isDemo?: boolean }) {
+  const now = nowIso();
+  const tenantId = uuid(), staffId = uuid();
+  const st: { sql: string; params: Param[] }[] = [];
+  st.push({ sql: "INSERT INTO tenants(id,slug,name,default_locale,is_demo,created_at) VALUES (?1,?2,?3,'en',?4,?5)", params: [tenantId, opts.slug, opts.name, opts.isDemo === false ? 0 : 1, now] });
+  st.push({ sql: "INSERT INTO staff(id,tenant_id,name) VALUES (?1,?2,'Specialist')", params: [staffId, tenantId] });
   for (const s of SERVICES) {
-    const row = await one<{ id: string }>(
-      db,
-      "INSERT INTO services(tenant_id,slug,title_i18n,desc_i18n,duration_min,buffer_min) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id",
-      [tenantId, s.slug, JSON.stringify(s.title), JSON.stringify(s.desc), s.duration, s.buffer],
-    );
-    await db.query("INSERT INTO staff_services(staff_id,service_id) VALUES ($1,$2)", [staff!.id, row!.id]);
+    const sid = uuid();
+    st.push({ sql: "INSERT INTO services(id,tenant_id,slug,title_i18n,desc_i18n,duration_min,buffer_min) VALUES (?1,?2,?3,?4,?5,?6,?7)", params: [sid, tenantId, s.slug, js(s.title), js(s.desc), s.duration, s.buffer] });
+    st.push({ sql: "INSERT INTO staff_services(staff_id,service_id) VALUES (?1,?2)", params: [staffId, sid] });
   }
   // Заглушка рабочих часов: вт–сб 10:00–18:00 местного времени (нужно подтвердить у мастера)
-  for (const wd of [2, 3, 4, 5, 6]) {
-    await db.query("INSERT INTO availability_rules(tenant_id,staff_id,weekday,start_min,end_min) VALUES ($1,$2,$3,$4,$5)", [tenantId, staff!.id, wd, 600, 1080]);
+  for (const wd of [2, 3, 4, 5, 6]) st.push({ sql: "INSERT INTO availability_rules(id,tenant_id,staff_id,weekday,start_min,end_min) VALUES (?1,?2,?3,?4,600,1080)", params: [uuid(), tenantId, staffId, wd] });
+  for (const key of ["rebook", "referral", "waitlist", "reactivation"]) st.push({ sql: "INSERT INTO automations(tenant_id,key) VALUES (?1,?2)", params: [tenantId, key] });
+  const snapshot: unknown[] = [];
+  for (const a of ARTICLES) for (const loc of ["en", "ru", "uk"] as const) {
+    st.push({ sql: "INSERT INTO knowledge_articles(id,tenant_id,key,topic,locale,title,answer,forbidden,status,approved_by,updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'approved','DEMO placeholder',?9)", params: [uuid(), tenantId, a.key, a.topic, loc, a.title[loc], a.answer[loc], js(a.forbidden), now] });
+    snapshot.push({ key: a.key, topic: a.topic, locale: loc, title: a.title[loc], answer: a.answer[loc], forbidden: a.forbidden });
   }
-  for (const key of ["rebook", "referral", "waitlist", "reactivation"]) {
-    await db.query("INSERT INTO automations(tenant_id,key) VALUES ($1,$2)", [tenantId, key]);
-  }
-  for (const a of ARTICLES) {
-    for (const loc of ["en", "ru", "uk"] as const) {
-      await db.query(
-        "INSERT INTO knowledge_articles(tenant_id,key,topic,locale,title,answer,forbidden,status,approved_by) VALUES ($1,$2,$3,$4,$5,$6,$7,'approved','DEMO placeholder')",
-        [tenantId, a.key, a.topic, loc, a.title[loc], a.answer[loc], JSON.stringify(a.forbidden)],
-      );
-    }
-  }
-  await publishKnowledge(db, tenantId, "DEMO placeholder (not approved by the specialist)");
+  st.push({ sql: "INSERT INTO knowledge_versions(id,tenant_id,version,snapshot,approved_by,active,created_at) VALUES (?1,?2,1,?3,?4,1,?5)", params: [uuid(), tenantId, js(snapshot), "DEMO placeholder (not approved by the specialist)", now] });
+  await db.batch(st); // всё или ничего
   return tenantId;
 }
 
 /** Публикация = неизменяемый снимок утверждённых статей. Черновики в снимок не попадают. */
-export async function publishKnowledge(db: Q, tenantId: string, approvedBy: string): Promise<number> {
-  const arts = await rows(db, "SELECT key,topic,locale,title,answer,forbidden FROM knowledge_articles WHERE tenant_id=$1 AND status='approved' ORDER BY key,locale", [tenantId]);
-  const last = await one<{ v: number | null }>(db, "SELECT max(version) v FROM knowledge_versions WHERE tenant_id=$1", [tenantId]);
+export async function publishKnowledge(db: Db, tenantId: string, approvedBy: string): Promise<number> {
+  const arts = await rows(db, "SELECT key,topic,locale,title,answer,forbidden FROM knowledge_articles WHERE tenant_id=?1 AND status='approved' ORDER BY key,locale", [tenantId]);
+  const last = await one<{ v: number | null }>(db, "SELECT max(version) v FROM knowledge_versions WHERE tenant_id=?1", [tenantId]);
   const version = (last?.v ?? 0) + 1;
-  await db.query("UPDATE knowledge_versions SET active=false WHERE tenant_id=$1", [tenantId]);
-  await db.query("INSERT INTO knowledge_versions(tenant_id,version,snapshot,approved_by,active) VALUES ($1,$2,$3,$4,true)", [tenantId, version, JSON.stringify(arts), approvedBy]);
+  await db.batch([
+    { sql: "UPDATE knowledge_versions SET active=0 WHERE tenant_id=?1", params: [tenantId] },
+    { sql: "INSERT INTO knowledge_versions(id,tenant_id,version,snapshot,approved_by,active,created_at) VALUES (?1,?2,?3,?4,?5,1,?6)", params: [uuid(), tenantId, version, js(arts), approvedBy, nowIso()] },
+  ]);
   return version;
 }
 
-export async function seedIfEmpty(db: Q) {
+export async function seedIfEmpty(db: Db) {
   const t = await one(db, "SELECT id FROM tenants LIMIT 1");
-  if (!t) await createTenant(db, { slug: "demo", name: "Hair Studio (demo)" });
+  if (t) return;
+  try { await createTenant(db, { slug: "demo", name: "Hair Studio (demo)" }); }
+  catch (e) { if (!/UNIQUE/i.test(String((e as Error).message))) throw e; } // параллельный первый запрос уже засеял
 }

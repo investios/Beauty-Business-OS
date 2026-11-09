@@ -11,9 +11,9 @@ export default function AiPage() {
     <OwnerShell current="ai">
       {async (t) => {
         const db = await getDb();
-        const hs = await rows<{ id: string; reason: string; summary: string; contact: string | null; status: string; created_at: string }>(db, "SELECT id,reason,summary,contact,status,created_at FROM handoffs WHERE tenant_id=$1 ORDER BY (status='open') DESC, created_at DESC LIMIT 30", [t.id]);
-        const arts = await rows<{ id: string; key: string; locale: string; title: string; answer: string; draft_answer: string | null; approved_by: string | null }>(db, "SELECT id,key,locale,title,answer,draft_answer,approved_by FROM knowledge_articles WHERE tenant_id=$1 ORDER BY key, locale", [t.id]);
-        const vs = await rows<{ version: number; approved_by: string; active: boolean; created_at: string }>(db, "SELECT version,approved_by,active,created_at FROM knowledge_versions WHERE tenant_id=$1 ORDER BY version DESC", [t.id]);
+        const hs = await rows<{ id: string; reason: string; summary: string; contact: string | null; status: string; created_at: string }>(db, "SELECT id,reason,summary,contact,status,created_at FROM handoffs WHERE tenant_id=?1 ORDER BY (status='open') DESC, created_at DESC LIMIT 30", [t.id]);
+        const arts = await rows<{ id: string; key: string; locale: string; title: string; answer: string; draft_answer: string | null; approved_by: string | null }>(db, "SELECT id,key,locale,title,answer,draft_answer,approved_by FROM knowledge_articles WHERE tenant_id=?1 ORDER BY key, locale", [t.id]);
+        const vs = await rows<{ version: number; approved_by: string; active: boolean; created_at: string }>(db, "SELECT version,approved_by,active,created_at FROM knowledge_versions WHERE tenant_id=?1 ORDER BY version DESC", [t.id]);
         const keys = [...new Set(arts.map((a) => a.key))];
         const drafts = arts.filter((a) => a.draft_answer).length;
         return (<>

@@ -7,8 +7,8 @@ export default function Clients() {
       {async (t) => {
         const db = await getDb();
         const list = await rows<{ id: string; name: string; contact: string; preferred_locale: string; visits: number; created_from: Record<string, string> }>(db,
-          `SELECT c.id,c.name,c.contact,c.preferred_locale,c.created_from,(SELECT count(*)::int FROM appointments a WHERE a.client_id=c.id AND a.status IN ('confirmed','completed')) visits
-           FROM clients c WHERE c.tenant_id=$1 ORDER BY c.created_at DESC LIMIT 200`, [t.id]);
+          `SELECT c.id,c.name,c.contact,c.preferred_locale,c.created_from,(SELECT count(*) FROM appointments a WHERE a.client_id=c.id AND a.status IN ('confirmed','completed')) visits
+           FROM clients c WHERE c.tenant_id=?1 ORDER BY c.created_at DESC LIMIT 200`, [t.id]);
         return (<>
           <h1>Клиенты</h1>
           {list.length === 0 && <p>Клиентов пока нет.</p>}

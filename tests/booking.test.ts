@@ -43,15 +43,15 @@ describe("booking atomicity", () => {
       expect(["slot_taken", "slot_unavailable"]).toContain(b.reason.code);
       expect(b.reason.alternatives.length).toBeGreaterThan(0); // предлагаем альтернативы
     }
-    const n = await one<{ n: number }>(c.db, "SELECT count(*)::int n FROM appointments WHERE status='confirmed'");
+    const n = await one<{ n: number }>(c.db, "SELECT count(*) n FROM appointments WHERE status='confirmed'");
     expect(n!.n).toBe(1);
   });
   it("database itself rejects overlap even if app logic is bypassed", async () => {
     const s = (await slots(c))[0];
     const r = await book(c, s.startUtc);
-    const a = await one<{ staff_id: string; client_id: string }>(c.db, "SELECT staff_id,client_id FROM appointments WHERE id=$1", [r.appointmentId]);
-    await expect(c.db.query(`INSERT INTO appointments(tenant_id,client_id,staff_id,service_id,start_at,end_at,blocked_until,status,idempotency_key,manage_token)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,'confirmed','raw-bypass-1','t')`, [c.tenantId, a!.client_id, a!.staff_id, c.consult.id, s.startUtc, s.endUtc, s.endUtc])).rejects.toThrow(/no_overlap|exclusion/);
+    const a = await one<{ staff_id: string; client_id: string }>(c.db, "SELECT staff_id,client_id FROM appointments WHERE id=?1", [r.appointmentId]);
+    await expect(c.db.run(`INSERT INTO appointments(id,tenant_id,client_id,staff_id,service_id,start_at,end_at,blocked_until,status,idempotency_key,manage_token,created_at)
+      VALUES ('raw-1',?1,?2,?3,?4,?5,?6,?7,'confirmed','raw-bypass-1','t','2026-11-09T08:00:00.000Z')`, [c.tenantId, a!.client_id, a!.staff_id, c.consult.id, s.startUtc, s.endUtc, s.endUtc])).rejects.toThrow(/slot_overlap/);
   });
   it("buffer after a visit is blocked", async () => {
     const all = await slots(c);
@@ -69,7 +69,7 @@ describe("booking atomicity", () => {
     const b = await book(c, s.startUtc, 1, k);
     expect(b.appointmentId).toBe(a.appointmentId);
     expect(b.replayed).toBe(true);
-    const n = await one<{ n: number }>(c.db, "SELECT count(*)::int n FROM appointments");
+    const n = await one<{ n: number }>(c.db, "SELECT count(*) n FROM appointments");
     expect(n!.n).toBe(1);
   });
   it("concurrent retries with same key create one appointment", async () => {
@@ -112,7 +112,7 @@ describe("cancel / reschedule / guest access", () => {
     const r = await book(c, s.startUtc);
     await cancelBooking(c.db, c.tenantId, r.appointmentId, r.manageToken);
     expect((await slots(c)).some((x) => x.startUtc === s.startUtc)).toBe(true);
-    const q = await rows(c.db, "SELECT status FROM notifications WHERE appointment_id=$1 AND kind='reminder_24h'", [r.appointmentId]);
+    const q = await rows(c.db, "SELECT status FROM notifications WHERE appointment_id=?1 AND kind='reminder_24h'", [r.appointmentId]);
     expect(q.every((x: any) => x.status === "cancelled")).toBe(true);
   });
   it("reschedule moves booking and leaves exactly one queued reminder", async () => {
@@ -120,7 +120,7 @@ describe("cancel / reschedule / guest access", () => {
     const r = await book(c, all[0].startUtc);
     const target = all.find((x) => x.startUtc.slice(0, 10) !== all[0].startUtc.slice(0, 10))!;
     await rescheduleBooking(c.db, { tenantId: c.tenantId, id: r.appointmentId, token: r.manageToken, newStartUtc: target.startUtc, now: NOW });
-    const q = await rows(c.db, "SELECT status FROM notifications WHERE appointment_id=$1 AND kind='reminder_24h' AND status='queued'", [r.appointmentId]);
+    const q = await rows(c.db, "SELECT status FROM notifications WHERE appointment_id=?1 AND kind='reminder_24h' AND status='queued'", [r.appointmentId]);
     expect(q).toHaveLength(1);
     const a = await getBookingByToken(c.db, c.tenantId, r.appointmentId, r.manageToken);
     expect(new Date(a!.start_at).toISOString()).toBe(target.startUtc);
@@ -149,7 +149,7 @@ describe("notifications honesty", () => {
     const r = await book(c, s.startUtc);
     expect(r.confirmationDeliveryStatus).toBe("not_configured");
     expect(r.status).toBe("confirmed"); // запись в календаре есть; письмо — отдельный честный статус
-    const n = await rows<{ status: string; kind: string }>(c.db, "SELECT kind,status FROM notifications WHERE appointment_id=$1", [r.appointmentId]);
+    const n = await rows<{ status: string; kind: string }>(c.db, "SELECT kind,status FROM notifications WHERE appointment_id=?1", [r.appointmentId]);
     expect(n.find((x) => x.kind === "booking_confirmation")!.status).toBe("not_configured");
     expect(n.some((x) => x.status === "sent" || x.status === "delivered")).toBe(false);
   });
@@ -161,10 +161,10 @@ describe("tenant isolation", () => {
     const r = await book(c, s.startUtc);
     expect(await getBookingByToken(c.db, c.tenantB, r.appointmentId, r.manageToken)).toBeNull();
     await expect(getAvailability(c.db, { tenantId: c.tenantB, serviceId: c.consult.id, now: NOW })).rejects.toMatchObject({ code: "not_found" });
-    const bClients = await rows(c.db, "SELECT id FROM clients WHERE tenant_id=$1", [c.tenantB]);
+    const bClients = await rows(c.db, "SELECT id FROM clients WHERE tenant_id=?1", [c.tenantB]);
     expect(bClients).toHaveLength(0);
     // та же услуга-слот в салоне B свободна независимо от A
-    const sb = await getAvailability(c.db, { tenantId: c.tenantB, serviceId: (await rows<{ id: string }>(c.db, "SELECT id FROM services WHERE tenant_id=$1 AND slug='consultation'", [c.tenantB]))[0].id, now: NOW });
+    const sb = await getAvailability(c.db, { tenantId: c.tenantB, serviceId: (await rows<{ id: string }>(c.db, "SELECT id FROM services WHERE tenant_id=?1 AND slug='consultation'", [c.tenantB]))[0].id, now: NOW });
     expect(sb.some((x) => x.startUtc === s.startUtc)).toBe(true);
   });
 });

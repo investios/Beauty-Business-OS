@@ -1,5 +1,4 @@
-import type { PGlite } from "@electric-sql/pglite";
-import { audit, one, rows } from "./db";
+import { audit, js, nowIso, one, rows, uuid, type Db } from "./db";
 import { getAvailability, listServices } from "./booking";
 import { formatLocal, localParts, weekdayOfLocalDate } from "./tz";
 
@@ -95,8 +94,8 @@ const T = {
 
 /* ---------- утверждённая база знаний: только активная опубликованная версия ---------- */
 type Snap = { key: string; topic: string; locale: string; title: string; answer: string }[];
-export async function activeKnowledge(db: Pick<PGlite, "query">, tenantId: string) {
-  const v = await one<{ version: number; snapshot: Snap }>(db, "SELECT version,snapshot FROM knowledge_versions WHERE tenant_id=$1 AND active", [tenantId]);
+export async function activeKnowledge(db: Db, tenantId: string) {
+  const v = await one<{ version: number; snapshot: Snap }>(db, "SELECT version,snapshot FROM knowledge_versions WHERE tenant_id=?1 AND active=1", [tenantId]);
   return v ?? { version: 0, snapshot: [] as Snap };
 }
 function article(kb: Snap, topic: string, locale: Locale) {
@@ -104,26 +103,29 @@ function article(kb: Snap, topic: string, locale: Locale) {
 }
 
 /* ---------- диалоги ---------- */
-export async function startConversation(db: PGlite, p: { tenantId: string; locale: Locale; channel?: string; source?: Record<string, string> }) {
+export async function startConversation(db: Db, p: { tenantId: string; locale: Locale; channel?: string; source?: Record<string, string> }) {
   const kb = await activeKnowledge(db, p.tenantId);
-  const c = await one<{ id: string }>(db, "INSERT INTO conversations(tenant_id,locale,channel,source) VALUES ($1,$2,$3,$4) RETURNING id", [p.tenantId, p.locale, p.channel ?? "website", JSON.stringify(p.source ?? {})]);
+  const convId = uuid();
+  await db.run("INSERT INTO conversations(id,tenant_id,locale,channel,source,created_at) VALUES (?1,?2,?3,?4,?5,?6)", [convId, p.tenantId, p.locale, p.channel ?? "website", js(p.source ?? {}), nowIso()]);
+  const c = { id: convId };
   const text = T.disclosure[p.locale];
-  await db.query("INSERT INTO messages(conversation_id,role,content,knowledge_version,meta) VALUES ($1,'assistant',$2,$3,$4)", [c!.id, text, kb.version, JSON.stringify({ kind: "disclosure" })]);
-  return { conversationId: c!.id, message: text };
+  await db.run("INSERT INTO messages(id,conversation_id,role,content,knowledge_version,meta,created_at) VALUES (?1,?2,'assistant',?3,?4,?5,?6)", [uuid(), c.id, text, kb.version, js({ kind: "disclosure" }), nowIso()]);
+  return { conversationId: c.id, message: text };
 }
 
-async function handoff(db: PGlite, tenantId: string, conversationId: string, reason: string, userText: string): Promise<string> {
-  const existing = await one<{ id: string }>(db, "SELECT id FROM handoffs WHERE conversation_id=$1 AND status='open' ORDER BY created_at DESC LIMIT 1", [conversationId]);
+async function handoff(db: Db, tenantId: string, conversationId: string, reason: string, userText: string): Promise<string> {
+  const existing = await one<{ id: string }>(db, "SELECT id FROM handoffs WHERE conversation_id=?1 AND status='open' ORDER BY rowid DESC LIMIT 1", [conversationId]);
   if (existing) return existing.id;
-  const msgs = await rows<{ role: string; content: string }>(db, "SELECT role,content FROM messages WHERE conversation_id=$1 AND (meta->>'kind') IS DISTINCT FROM 'disclosure' ORDER BY created_at DESC LIMIT 4", [conversationId]);
+  const msgs = await rows<{ role: string; content: string }>(db, "SELECT role,content FROM messages WHERE conversation_id=?1 AND COALESCE(json_extract(meta,'$.kind'),'') <> 'disclosure' ORDER BY rowid DESC LIMIT 4", [conversationId]);
   const summary = msgs.reverse().filter((m) => m.role === "user").map((m) => m.content).join(" / ").slice(0, 500) || userText.slice(0, 500);
-  const h = await one<{ id: string }>(db, "INSERT INTO handoffs(tenant_id,conversation_id,reason,summary) VALUES ($1,$2,$3,$4) RETURNING id", [tenantId, conversationId, reason, summary]);
-  await audit(db, tenantId, "ai", "handoff.create", h!.id, { reason });
-  return h!.id;
+  const hid = uuid();
+  await db.run("INSERT INTO handoffs(id,tenant_id,conversation_id,reason,summary,created_at) VALUES (?1,?2,?3,?4,?5,?6)", [hid, tenantId, conversationId, reason, summary, nowIso()]);
+  await audit(db, tenantId, "ai", "handoff.create", hid, { reason });
+  return hid;
 }
 
-export async function handleMessage(db: PGlite, p: { tenantId: string; conversationId: string; text: string; localeHint: Locale; now?: Date }): Promise<AiReply> {
-  const conv = await one<{ id: string; locale: string }>(db, "SELECT id,locale FROM conversations WHERE id=$1 AND tenant_id=$2", [p.conversationId, p.tenantId]);
+export async function handleMessage(db: Db, p: { tenantId: string; conversationId: string; text: string; localeHint: Locale; now?: Date }): Promise<AiReply> {
+  const conv = await one<{ id: string; locale: string }>(db, "SELECT id,locale FROM conversations WHERE id=?1 AND tenant_id=?2", [p.conversationId, p.tenantId]);
   if (!conv) throw new Error("conversation not found");
   const text = p.text.trim().slice(0, 1000);
   const locale = detectLocale(text, p.localeHint);
@@ -136,8 +138,8 @@ export async function handleMessage(db: PGlite, p: { tenantId: string; conversat
   let requiresHuman = false;
   let handoffId: string | undefined;
 
-  await db.query("INSERT INTO messages(conversation_id,role,content) VALUES ($1,'user',$2)", [conv.id, text]);
-  await db.query("UPDATE conversations SET locale=$2 WHERE id=$1", [conv.id, locale]);
+  await db.run("INSERT INTO messages(id,conversation_id,role,content,created_at) VALUES (?1,?2,'user',?3,?4)", [uuid(), conv.id, text, nowIso()]);
+  await db.run("UPDATE conversations SET locale=?2 WHERE id=?1", [conv.id, locale]);
 
   const primary = intents[0];
   if (primary === "medical" || primary === "human" || primary === "unknown") {
@@ -146,10 +148,10 @@ export async function handleMessage(db: PGlite, p: { tenantId: string; conversat
     requiresHuman = true;
     parts.push(primary === "medical" ? T.medical[locale] : primary === "human" ? T.human[locale] : T.unknown[locale]);
   } else if (primary === "contact") {
-    const open = await one<{ id: string }>(db, "SELECT id FROM handoffs WHERE conversation_id=$1 AND status='open' AND contact IS NULL ORDER BY created_at DESC LIMIT 1", [conv.id]);
+    const open = await one<{ id: string }>(db, "SELECT id FROM handoffs WHERE conversation_id=?1 AND status='open' AND contact IS NULL ORDER BY rowid DESC LIMIT 1", [conv.id]);
     const contact = text.match(CONTACT_RE)?.[0];
     if (open && contact) {
-      await db.query("UPDATE handoffs SET contact=$1 WHERE id=$2", [contact, open.id]);
+      await db.run("UPDATE handoffs SET contact=?1 WHERE id=?2", [contact, open.id]);
       tools.push({ tool: "requestHandoff", ok: true, detail: "contact attached" });
       requiresHuman = true; handoffId = open.id;
       parts.push(T.contactSaved[locale]);
@@ -195,6 +197,6 @@ export async function handleMessage(db: PGlite, p: { tenantId: string; conversat
   }
 
   const message = parts.join("\n\n");
-  await db.query("INSERT INTO messages(conversation_id,role,content,knowledge_version,meta) VALUES ($1,'assistant',$2,$3,$4)", [conv.id, message, kbv.version, JSON.stringify({ intents, citations, tools, engine: "scripted-demo" })]);
+  await db.run("INSERT INTO messages(id,conversation_id,role,content,knowledge_version,meta,created_at) VALUES (?1,?2,'assistant',?3,?4,?5,?6)", [uuid(), conv.id, message, kbv.version, js({ intents, citations, tools, engine: "scripted-demo" }), nowIso()]);
   return { message, locale, intent: primary, knowledgeVersion: kbv.version, citations, slots, requiresHuman, handoffId, toolResults: tools, engine: "scripted-demo" };
 }

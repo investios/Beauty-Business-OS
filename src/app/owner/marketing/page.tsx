@@ -15,12 +15,12 @@ export default function Marketing() {
     <OwnerShell current="marketing">
       {async (t) => {
         const db = await getDb();
-        const src = await rows<{ source: string; campaign: string; leads: number }>(db, `SELECT coalesce(source->>'utm_source', source->>'channel', 'прямой заход') source, coalesce(source->>'utm_campaign','—') campaign, count(*)::int leads
-          FROM appointments WHERE tenant_id=$1 AND status IN ('confirmed','completed') GROUP BY 1,2 ORDER BY 3 DESC`, [t.id]);
-        const conv = (await rows<{ n: number }>(db, "SELECT count(*)::int n FROM conversations WHERE tenant_id=$1", [t.id]))[0].n;
-        const booked = (await rows<{ n: number }>(db, "SELECT count(*)::int n FROM appointments WHERE tenant_id=$1 AND status IN ('confirmed','completed')", [t.id]))[0].n;
-        const hand = (await rows<{ n: number }>(db, "SELECT count(*)::int n FROM handoffs WHERE tenant_id=$1", [t.id]))[0].n;
-        const autos = await rows<{ key: string; enabled: boolean }>(db, "SELECT key,enabled FROM automations WHERE tenant_id=$1 ORDER BY key", [t.id]);
+        const src = await rows<{ src_name: string; campaign: string; leads: number }>(db, `SELECT coalesce(json_extract(source,'$.utm_source'), json_extract(source,'$.channel'), 'прямой заход') src_name, coalesce(json_extract(source,'$.utm_campaign'),'—') campaign, count(*) leads
+          FROM appointments WHERE tenant_id=?1 AND status IN ('confirmed','completed') GROUP BY 1,2 ORDER BY 3 DESC`, [t.id]);
+        const conv = (await rows<{ n: number }>(db, "SELECT count(*) n FROM conversations WHERE tenant_id=?1", [t.id]))[0].n;
+        const booked = (await rows<{ n: number }>(db, "SELECT count(*) n FROM appointments WHERE tenant_id=?1 AND status IN ('confirmed','completed')", [t.id]))[0].n;
+        const hand = (await rows<{ n: number }>(db, "SELECT count(*) n FROM handoffs WHERE tenant_id=?1", [t.id]))[0].n;
+        const autos = await rows<{ key: string; enabled: boolean }>(db, "SELECT key,enabled FROM automations WHERE tenant_id=?1 ORDER BY key", [t.id]);
         return (<>
           <h1>Маркетинг</h1>
           <div className="stats">
@@ -29,7 +29,7 @@ export default function Marketing() {
             <div className="stat"><b>{hand}</b><span>передано мастеру</span></div>
           </div>
           <section><h2>Откуда приходят записи</h2>
-            {src.length === 0 ? <p>Данных пока нет.</p> : <div className="tbl-wrap"><table><thead><tr><th>Источник</th><th>Кампания</th><th>Записей</th></tr></thead><tbody>{src.map((r, i) => <tr key={i}><td>{r.source}</td><td>{r.campaign}</td><td>{r.leads}</td></tr>)}</tbody></table></div>}
+            {src.length === 0 ? <p>Данных пока нет.</p> : <div className="tbl-wrap"><table><thead><tr><th>Источник</th><th>Кампания</th><th>Записей</th></tr></thead><tbody>{src.map((r, i) => <tr key={i}><td>{r.src_name}</td><td>{r.campaign}</td><td>{r.leads}</td></tr>)}</tbody></table></div>}
           </section>
           <section><h2>Четыре автоматизации</h2>
             <p className="warnbox" style={{ marginBottom: 12 }}>Сейчас переключатель только сохраняет ваше решение. Реальные сообщения не отправляются: почта, SMS и мессенджеры не подключены, а согласия клиентов ещё не собираются в боевом режиме.</p>

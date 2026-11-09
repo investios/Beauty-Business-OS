@@ -8,10 +8,13 @@
 ```bash
 npm install
 cp .env.example .env.local   # задайте OWNER_PASSWORD и SESSION_SECRET
-npm run build && npm start   # http://localhost:3000
+npm run build && npm start   # http://localhost:3000 (локально база: файл .data/app.sqlite)
 ```
 Без `.env.local` в режиме разработки (`npm run dev`) пароль кабинета `demo-owner`; в production пароль и ключ обязательны.
 - Сайт: `/en`, `/ru`, `/uk` · Запись: `/ru/book` · Кабинет: `/owner`
+
+## Cloudflare
+Сайт и база (D1) выкладываются на Cloudflare, см. `docs/DEPLOY_CLOUDFLARE.md`.
 
 ## Проверки
 ```bash
@@ -23,4 +26,4 @@ node tests/e2e/journey.cjs   # путь клиента, чат, кабинет
 ```
 
 ## Структура
-`src/lib/booking.ts` движок записи · `src/lib/ai.ts` диалог и база знаний · `src/lib/schema.ts` схема БД · `src/app/api/v1/…` API · `src/app/[locale]` сайт · `src/app/owner` кабинет · `docs/` решения и вопросы.
+`src/lib/booking.ts` движок записи · `src/lib/ai.ts` диалог и база знаний · `migrations/0001_init.sql` схема БД · `src/app/api/v1/…` API · `src/app/[locale]` сайт · `src/app/owner` кабинет · `docs/` решения и вопросы.

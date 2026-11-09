@@ -1,11 +1,11 @@
-import { createDb } from "@/lib/db";
+import { createSqlite } from "@/lib/db";
 import { createTenant } from "@/lib/seed";
 import { listServices } from "@/lib/booking";
 
 export const NOW = new Date("2026-11-09T08:00:00Z");
 
 export async function setup() {
-  const db = await createDb();
+  const db = await createSqlite(":memory:");
   const tenantId = await createTenant(db, { slug: "a", name: "A" });
   const tenantB = await createTenant(db, { slug: "b", name: "B" });
   const services = await listServices(db, tenantId);

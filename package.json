@@ -7,13 +7,19 @@
     "build": "next build",
     "start": "next start -p 3000",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare deploy",
+    "db:local": "wrangler d1 migrations apply beauty-os --local",
+    "db:remote": "wrangler d1 migrations apply beauty-os --remote"
   },
   "dependencies": {
-    "@electric-sql/pglite": "^0.5.15",
+    "@opennextjs/cloudflare": "^1.20.16",
     "next": "^16.4.5",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "wrangler": "^4.158.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {

@@ -61,7 +61,7 @@ async function route(req: Request, ctx: Ctx, method: "GET" | "POST") {
       if (method === "GET" && !m[2]) {
         const a = await getBookingByToken(db, tenant.id, id, token);
         if (!a) return err(404, "not_found", "Booking not found");
-        const svc = await one<{ title_i18n: Record<string, string>; duration_min: number }>(db, "SELECT title_i18n,duration_min FROM services WHERE id=$1", [a.service_id]);
+        const svc = await one<{ title_i18n: Record<string, string>; duration_min: number }>(db, "SELECT title_i18n,duration_min FROM services WHERE id=?1", [a.service_id]);
         return json({ id: a.id, status: a.status, startsAtUtc: new Date(a.start_at).toISOString(), endsAtUtc: new Date(a.end_at).toISOString(), serviceId: a.service_id, service: svc?.title_i18n, timezone: tenant.timezone });
       }
       if (method === "POST" && m[2] === "cancel") return json(await cancelBooking(db, tenant.id, id, token));

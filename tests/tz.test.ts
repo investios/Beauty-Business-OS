@@ -24,8 +24,8 @@ describe("Europe/Dublin DST", () => {
   });
   it("slot engine never offers nonexistent or ambiguous local times, and has no gaps around them", async () => {
     const c = await setup();
-    const staff = (await c.db.query<{ id: string }>("SELECT id FROM staff WHERE tenant_id=$1", [c.tenantId])).rows[0].id;
-    await c.db.query("INSERT INTO availability_rules(tenant_id,staff_id,weekday,start_min,end_min) VALUES ($1,$2,0,0,300)", [c.tenantId, staff]); // воскресенье 00:00–05:00
+    const staff = (await c.db.all<{ id: string }>("SELECT id FROM staff WHERE tenant_id=?1", [c.tenantId]))[0].id;
+    await c.db.run("INSERT INTO availability_rules(id,tenant_id,staff_id,weekday,start_min,end_min) VALUES ('sun-rule',?1,?2,0,0,300)", [c.tenantId, staff]); // воскресенье 00:00–05:00
     const spring = await getAvailability(c.db, { tenantId: c.tenantId, serviceId: c.consult.id, from: new Date("2026-03-28T12:00:00Z"), now: new Date("2026-03-20T00:00:00Z"), days: 2 });
     const sunSpring = spring.filter((s) => s.startUtc.startsWith("2026-03-29")).map((s) => s.startUtc);
     expect(sunSpring).not.toContain("2026-03-29T01:00:00.000Z" + "x");

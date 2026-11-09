@@ -47,5 +47,5 @@ export async function ownerTenant() {
   const s = readSession(jar.get(COOKIE)?.value);
   if (!s) return null;
   const db = await getDb();
-  return one<{ id: string; name: string; slug: string; is_demo: boolean }>(db, "SELECT id,name,slug,is_demo FROM tenants WHERE id=$1", [s.tenantId]);
+  return one<{ id: string; name: string; slug: string; is_demo: boolean }>(db, "SELECT id,name,slug,is_demo FROM tenants WHERE id=?1", [s.tenantId]);
 }

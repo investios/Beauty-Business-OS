@@ -48,7 +48,7 @@ describe("price honesty", () => {
     expect(r.message).not.toMatch(/€|\b50\b/);
   });
   it("shows a price only when the owner confirmed it in the price table", async () => {
-    await c.db.query("UPDATE services SET price_mode='from', price_from_cents=6000 WHERE tenant_id=$1 AND slug='consultation'", [c.tenantId]);
+    await c.db.run("UPDATE services SET price_mode='from', price_from_cents=6000 WHERE tenant_id=?1 AND slug='consultation'", [c.tenantId]);
     const r = await say("How much is the consultation?", "en");
     expect(r.message).toContain("€60");
   });
@@ -76,7 +76,7 @@ describe("handoff", () => {
     expect(r.requiresHuman).toBe(true);
     expect(r.message).toMatch(/не могу оценивать симптомы/i);
     expect(r.message).not.toMatch(/мажьте|принимайте|попробуйте крем|это аллерг/i);
-    const h = await rows(c.db, "SELECT reason,summary FROM handoffs WHERE tenant_id=$1", [c.tenantId]);
+    const h = await rows(c.db, "SELECT reason,summary FROM handoffs WHERE tenant_id=?1", [c.tenantId]);
     expect(h).toHaveLength(1);
     expect((h[0] as any).reason).toBe("medical");
   });
@@ -85,7 +85,7 @@ describe("handoff", () => {
     expect(r.requiresHuman).toBe(true);
     const r2 = await say("my email is anna@example.com", "en");
     expect(r2.requiresHuman).toBe(true);
-    const h = await one<{ contact: string }>(c.db, "SELECT contact FROM handoffs WHERE tenant_id=$1", [c.tenantId]);
+    const h = await one<{ contact: string }>(c.db, "SELECT contact FROM handoffs WHERE tenant_id=?1", [c.tenantId]);
     expect(h!.contact).toBe("anna@example.com");
   });
   it("client can ask for a human", async () => {
@@ -96,17 +96,17 @@ describe("handoff", () => {
 describe("approved knowledge only", () => {
   it("draft edits are ignored until published; rollback restores old answer", async () => {
     const before = (await say("Что с подготовкой к визиту?")).message;
-    await c.db.query("UPDATE knowledge_articles SET answer='UNAPPROVED DRAFT TEXT', status='draft' WHERE tenant_id=$1 AND key='preparation' AND locale='ru'", [c.tenantId]);
+    await c.db.run("UPDATE knowledge_articles SET answer='UNAPPROVED DRAFT TEXT', status='draft' WHERE tenant_id=?1 AND key='preparation' AND locale='ru'", [c.tenantId]);
     expect((await say("Что с подготовкой к визиту?")).message).toBe(before);
     expect((await say("Что с подготовкой к визиту?")).message).not.toContain("UNAPPROVED");
     // Публикуем новую версию с одобренным текстом
-    await c.db.query("UPDATE knowledge_articles SET answer='Новый утверждённый текст про подготовку.', status='approved' WHERE tenant_id=$1 AND key='preparation' AND locale='ru'", [c.tenantId]);
+    await c.db.run("UPDATE knowledge_articles SET answer='Новый утверждённый текст про подготовку.', status='approved' WHERE tenant_id=?1 AND key='preparation' AND locale='ru'", [c.tenantId]);
     const v2 = await publishKnowledge(c.db, c.tenantId, "master");
     const r2 = await say("Что с подготовкой к визиту?");
     expect(r2.message).toContain("Новый утверждённый текст");
     expect(r2.knowledgeVersion).toBe(v2);
     // Откат на версию 1
-    await c.db.query("UPDATE knowledge_versions SET active=(version=1) WHERE tenant_id=$1", [c.tenantId]);
+    await c.db.run("UPDATE knowledge_versions SET active=(version=1) WHERE tenant_id=?1", [c.tenantId]);
     const r3 = await say("Что с подготовкой к визиту?");
     expect(r3.message).toBe(before);
     expect(r3.knowledgeVersion).toBe(1);
