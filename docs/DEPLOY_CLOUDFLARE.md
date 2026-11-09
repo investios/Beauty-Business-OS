@@ -36,3 +36,9 @@ npm run cf:preview                    # http://localhost:8787
 - База: D1 `beauty-os`, регион EU (EEUR), миграция 0001 применена
 - Секреты `OWNER_PASSWORD` и `SESSION_SECRET` заданы в Cloudflare, в репозитории их нет
 - Проверено на боевом адресе: страницы EN/RU/UA, вход в кабинет (неверный пароль даёт 401), вёрстка 48 сочетаний страница×ширина
+
+## Автоматическая выкладка (с 2026-11-09)
+Репозиторий подключён к Cloudflare (Workers Builds). Ветка `feat/mila-platform` — рабочая ветка; каждое сохранение в неё собирается и выкладывается автоматически.
+Build: `npm ci && npx opennextjs-cloudflare build`. Deploy: `npx wrangler deploy`. Ключи и токены в чат не нужны.
+Секреты (OWNER_PASSWORD, SESSION_SECRET) хранятся в Cloudflare и при сборках не сбрасываются.
+Перед каждым сохранением в ветку прогоняем `npm run guard` локально.
