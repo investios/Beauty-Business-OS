@@ -158,7 +158,8 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
   const primary = intents[0];
   // Вопрос вне сценариев: пробуем модель (Cloudflare Workers AI) по утверждённым знаниям; при отказе, сбое или небезопасном ответе — передача мастеру
   let llmText: string | null = null;
-  if (primary === "unknown") {
+  const llmEligible = intents.every((i) => ["unknown", "extensions", "technique", "preparation"].includes(i));
+  if (llmEligible) {
     const hist = await rows<{ role: string; content: string }>(db, "SELECT role,content FROM messages WHERE conversation_id=?1 AND COALESCE(json_extract(meta,'$.kind'),'') <> 'disclosure' ORDER BY rowid DESC LIMIT 8", [conv.id]);
     const msgs: ChatMsg[] = [{ role: "system", content: buildSystemPrompt(locale) }, ...hist.reverse().map((m) => ({ role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant", content: m.content }))];
     const out = await (p.llm ?? runLlm)(msgs);
