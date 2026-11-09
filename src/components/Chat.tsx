@@ -2,12 +2,28 @@
 import { useEffect, useRef, useState } from "react";
 import type { Key } from "@/lib/i18n";
 import { api, captureSource, newKey } from "@/lib/client";
-import { splitReply } from "@/lib/split-reply";
+import { msPerWord, tokens, totalMs } from "@/lib/typing";
 type Dict = Record<Key, string>;
 type Slot = { startUtc: string; label: string; serviceId: string };
-type Msg = { id: number; role: "bot" | "me" | "sys"; text: string; slots?: Slot[]; human?: boolean; articles?: { slug: string; title: string; href: string }[] };
+type Msg = { id: number; role: "bot" | "me" | "sys"; text: string; slots?: Slot[]; human?: boolean; anim?: boolean; articles?: { slug: string; title: string; href: string }[] };
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+/** Показывает текст по словам; для программ чтения с экрана выдаёт сразу весь текст */
+function Typed({ text }: { text: string }) {
+  const parts = tokens(text);
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    const step = msPerWord(parts.length);
+    const t = setInterval(() => {
+      setN((k) => (k >= parts.length ? k : k + 1));
+      const log = document.querySelector(".chat-log"); log?.scrollTo({ top: log.scrollHeight });
+    }, step);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
+  return <><span className="sr-only">{text}</span><span aria-hidden="true">{parts.slice(0, n).join("")}</span></>;
+}
+
 export default function Chat({ locale, d }: { locale: "en" | "ru" | "uk"; d: Dict }) {
   const [open, setOpen] = useState(false);
   const [convId, setConvId] = useState<string | null>(null);
@@ -26,21 +42,18 @@ export default function Chat({ locale, d }: { locale: "en" | "ru" | "uk"; d: Dic
   const add = (m: Omit<Msg, "id">) => setMsgs((x) => [...x, { ...m, id: ++idRef.current }]);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
-  /** Ответ показываем по частям, как живой человек: «печатает…», пауза по длине, затем следующая строка */
+  /** Ответ «печатается» по словам в одном пузыре, со скоростью чтения; кнопки и ссылки появляются в конце */
   async function deliver(full: string, extra: Partial<Msg> = {}) {
-    const parts = splitReply(full);
     const calm = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    for (let i = 0; i < parts.length; i++) {
-      if (!calm) {
-        setTyping(true);
-        await sleep(Math.min(1700, 450 + parts[i].length * 16));
-        if (!alive.current) return;
-        setTyping(false);
-      }
-      const last = i === parts.length - 1;
-      add({ role: "bot", text: parts[i], ...(last ? extra : {}) });
-      if (!last && !calm) await sleep(250);
-    }
+    if (calm) { add({ role: "bot", text: full, ...extra }); return; }
+    setTyping(true); await sleep(500);
+    if (!alive.current) return;
+    setTyping(false);
+    const id = ++idRef.current;
+    setMsgs((x) => [...x, { id, role: "bot", text: full, anim: true }]);
+    await sleep(totalMs(full) + 200);
+    if (!alive.current) return;
+    setMsgs((x) => x.map((m) => (m.id === id ? { ...m, anim: false, ...extra } : m)));
   }
 
   useEffect(() => {
@@ -116,7 +129,7 @@ export default function Chat({ locale, d }: { locale: "en" | "ru" | "uk"; d: Dic
       <div className="chat-log" ref={logRef} role="log" aria-live="polite">
         {msgs.map((m) => (
           <div key={m.id} style={{ display: "contents" }}>
-            <div className={`bubble ${m.role === "me" ? "me" : m.role === "bot" ? "bot" : "sys"}`}>{m.text}</div>
+            <div className={`bubble ${m.role === "me" ? "me" : m.role === "bot" ? "bot" : "sys"}`}>{m.anim ? <Typed text={m.text} /> : m.text}</div>
             {m.articles && m.articles.length > 0 && (
               <div className="chat-slots">
                 {m.articles.map((a) => <a key={a.slug} className="btn btn-secondary btn-sm" href={a.href} target="_blank" rel="noopener">{a.title}</a>)}
