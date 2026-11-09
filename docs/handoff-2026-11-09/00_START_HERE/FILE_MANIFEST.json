@@ -1,0 +1,121 @@
+{
+  "package": "Beauty Business OS handoff",
+  "date": "2026-11-09",
+  "files": [
+    {
+      "path": "00_START_HERE/PROJECT_BRIEF_FOR_DEVELOPER.md",
+      "size": 5928,
+      "sha256": "7c026c0dd2653809431fe1ec71ffcfd540c2bed39fd60179420e9603bbac631e"
+    },
+    {
+      "path": "00_START_HERE/README_FIRST.md",
+      "size": 5914,
+      "sha256": "fda268b6c1cd8df9c4b025b7262d86042f40b4b83a99c98ee9eb98fd02b7e6cb"
+    },
+    {
+      "path": "01_CONTEXT_AND_RESEARCH/DECISION_HISTORY_2026-11-06_TO_11-09.md",
+      "size": 18538,
+      "sha256": "473d992aa31863e915a019c71edd37e9e1070d1888343f5373b8d6eca85315a2"
+    },
+    {
+      "path": "01_CONTEXT_AND_RESEARCH/RESEARCH_SYNTHESIS_NOV06.md",
+      "size": 12919,
+      "sha256": "2a955320d9148cbaf3e6f1dde46a9d080decf650d3d4c84c9a28287d7318ddb4"
+    },
+    {
+      "path": "02_PRODUCT_SPEC/Current_Product_Architecture_v0.1.docx",
+      "size": 35983,
+      "sha256": "88cf8e886aa2a79bb0952f9bb24429c632d6df8de685820bf8d697b0cf64d0b8"
+    },
+    {
+      "path": "02_PRODUCT_SPEC/Current_Product_Architecture_v0.1.md",
+      "size": 32298,
+      "sha256": "0ff8564a0401b3a8fe5bda2159a688cae2e3b4cfdfa7a69b9af4bd9c92a7355d"
+    },
+    {
+      "path": "02_PRODUCT_SPEC/Current_Product_Architecture_v0.1.pdf",
+      "size": 125515,
+      "sha256": "f118fc1ae57ced2b803f2bb0d385395bd4eb4968ef83d1aed997c806d7f79c79"
+    },
+    {
+      "path": "02_PRODUCT_SPEC/ENGINEERING_SPEC_FOR_CLAUDE_CODE.md",
+      "size": 15919,
+      "sha256": "573b8d45da0a3c654407bf0b6c9f4c3751e23541950fe53d818d5b6c9cd0409d"
+    },
+    {
+      "path": "03_DESIGN_UX/DESIGN_SYSTEM_AND_UX_BRIEF.md",
+      "size": 10958,
+      "sha256": "b9ab2af261b35e78f105364436462ec4564bf87282e23972391e8c8318147350"
+    },
+    {
+      "path": "04_AI_AND_MARKETING/EXPERT_AI_AND_CONVERSION_FLOWS.md",
+      "size": 11372,
+      "sha256": "8394153b93a44c6fdf76cac19b08c675973b3885b67a4405eb682138027f4818"
+    },
+    {
+      "path": "05_INTEGRATIONS_AND_TESTS/ACCEPTANCE_AND_TESTS.md",
+      "size": 3921,
+      "sha256": "14f9962904e5d8570cf300bd848610245d9a988b5695b1f99782c1dbc6e984f6"
+    },
+    {
+      "path": "05_INTEGRATIONS_AND_TESTS/INTEGRATION_MATRIX.md",
+      "size": 4950,
+      "sha256": "9bc8c2a3c982823b68b8e0c82ed38a899e440106281fbfd2f81a03eddb82f98d"
+    },
+    {
+      "path": "06_ROADMAP_AND_HANDOFF/CLAUDE_CODE_START_PROMPT.md",
+      "size": 3317,
+      "sha256": "7d6994bbc230c43ceecde86031a025e7f962617d1a37ef00fac323be52d4b6ee"
+    },
+    {
+      "path": "06_ROADMAP_AND_HANDOFF/IMPLEMENTATION_PLAN.md",
+      "size": 5866,
+      "sha256": "455d3fd88dab2edb0084a98b466615f91f0e879c0eb56eaf7c6567ec14137bbc"
+    },
+    {
+      "path": "07_DEMO/DEMO_SINGLE_FILE.html",
+      "size": 757904,
+      "sha256": "0e31dc24262a995793c4e21d685afd08422094f45658af195b513c16392269d0"
+    },
+    {
+      "path": "07_DEMO/README.md",
+      "size": 2077,
+      "sha256": "b4feca9dbb6d7cef458d6efee3dfe75b8c2aec2563ac69a54add25930d23f6de"
+    },
+    {
+      "path": "07_DEMO/assets/demo_portrait.png",
+      "size": 539885,
+      "sha256": "590ebddc324fe0f1f14ac61fe4b983b94d52519a02d81cafb274e309d9e48811"
+    },
+    {
+      "path": "07_DEMO/demo_crm_screenshot.png",
+      "size": 56060,
+      "sha256": "e78d0a6684f335554e947a41c05c397719688eac6010053f9a6fee208d57c578"
+    },
+    {
+      "path": "07_DEMO/demo_mobile_screenshot.png",
+      "size": 549710,
+      "sha256": "1e99dc4d423512e60964a2fe46420b8dbbd1385daa8bab4ea43447b0c04b27f5"
+    },
+    {
+      "path": "07_DEMO/index.html",
+      "size": 38058,
+      "sha256": "5ce13073641ee44940285f37a21df938e4eac123112f82cfe8ee582cd7678594"
+    },
+    {
+      "path": "08_VISUAL_CONCEPTS/README.md",
+      "size": 1131,
+      "sha256": "77be6f63b99956e8f7c2eb0d4377813e9e67c8c1bff64a964e4e77d3d8346f2a"
+    },
+    {
+      "path": "08_VISUAL_CONCEPTS/Visual_Concept_A.png",
+      "size": 2046465,
+      "sha256": "db1758d25087f668cbd0dc03037b1fb3438c3129eae4de5f8e709c9ab50a2b92"
+    },
+    {
+      "path": "08_VISUAL_CONCEPTS/Visual_Concept_B.png",
+      "size": 1996771,
+      "sha256": "8a39f98e492e88745e3b6a5f3bf4b285475daeb9c227d030d4d2242f1034d932"
+    }
+  ]
+}

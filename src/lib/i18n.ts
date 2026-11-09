@@ -1,0 +1,94 @@
+export const LOCALES = ["en", "ru", "uk"] as const;
+export type Loc = (typeof LOCALES)[number];
+export const isLoc = (x: string): x is Loc => (LOCALES as readonly string[]).includes(x);
+export const LOCALE_LABEL: Record<Loc, string> = { en: "EN", ru: "RU", uk: "UA" };
+export const HTML_LANG: Record<Loc, string> = { en: "en-IE", ru: "ru", uk: "uk" };
+
+type D = Record<string, string>;
+const dict = {
+  brand: { en: "Hair Studio", ru: "Hair Studio", uk: "Hair Studio" },
+  demo: { en: "DEMO", ru: "ДЕМО", uk: "ДЕМО" },
+  navBook: { en: "Book", ru: "Записаться", uk: "Записатися" },
+  heroKicker: { en: "Individual hair expertise", ru: "Индивидуальная работа с волосами", uk: "Індивідуальна робота з волоссям" },
+  heroTitle: { en: "Individual work on the beauty of your hair", ru: "Индивидуальная работа с красотой ваших волос", uk: "Індивідуальна робота з красою вашого волосся" },
+  heroText: { en: "Hair extensions and the specialist's own technique. Ask a question or choose a convenient time for a consultation.", ru: "Наращивание волос и авторская технология мастера. Задайте вопрос или выберите удобное время для консультации.", uk: "Нарощування волосся та авторська технологія майстра. Поставте запитання або оберіть зручний час для консультації." },
+  ctaBook: { en: "Choose a time", ru: "Выбрать время", uk: "Обрати час" },
+  ctaAsk: { en: "Ask a question", ru: "Задать вопрос", uk: "Поставити запитання" },
+  trust1: { en: "Booking without registration", ru: "Запись без регистрации", uk: "Запис без реєстрації" },
+  trust2: { en: "Questions in EN · RU · UA", ru: "Вопросы на EN · RU · UA", uk: "Запитання EN · RU · UA" },
+  trust3: { en: "Data used only for your booking", ru: "Данные только для вашей записи", uk: "Дані лише для вашого запису" },
+  photoLabel: { en: "Demo placeholder", ru: "Демо-заглушка", uk: "Демо-заглушка" },
+  photoNote: { en: "Photos of the specialist's real work will appear here after her permission", ru: "Здесь появятся фотографии реальных работ мастера после её согласия", uk: "Тут з'являться фотографії реальних робіт майстра після її згоди" },
+  servicesKicker: { en: "Services", ru: "Услуги", uk: "Послуги" },
+  servicesTitle: { en: "Services and consultation", ru: "Услуги и консультация", uk: "Послуги та консультація" },
+  servicesNote: { en: "Prices and durations will be added after the specialist confirms them", ru: "Цены и длительность будут добавлены после подтверждения мастером", uk: "Ціни та тривалість буде додано після підтвердження майстром" },
+  minutes: { en: "min", ru: "мин", uk: "хв" },
+  bookThis: { en: "Book", ru: "Записаться", uk: "Записатися" },
+  howKicker: { en: "How it works", ru: "Как это работает", uk: "Як це працює" },
+  howTitle: { en: "From the first question to the visit", ru: "От первого вопроса до визита", uk: "Від першого запитання до візиту" },
+  how1: { en: "Ask a question or go straight to booking", ru: "Задайте вопрос или сразу выберите время", uk: "Поставте запитання або одразу оберіть час" },
+  how2: { en: "Pick a free time from the real calendar", ru: "Выберите свободное время из настоящего календаря", uk: "Оберіть вільний час із реального календаря" },
+  how3: { en: "Leave your name and contact", ru: "Оставьте имя и контакт", uk: "Залиште ім'я та контакт" },
+  how4: { en: "Change or cancel later with your personal link", ru: "Перенесите или отмените по личной ссылке", uk: "Перенесіть або скасуйте за особистим посиланням" },
+  aiNote: { en: "The assistant is optional. It is an AI that answers only from information approved by the specialist and passes anything else to her", ru: "Ассистент необязателен. Это ИИ: он отвечает только по информации, утверждённой мастером, а остальное передаёт ей", uk: "Асистент необов'язковий. Це ШІ: він відповідає лише за інформацією, затвердженою майстром, а решту передає їй" },
+  faqKicker: { en: "Questions", ru: "Вопросы", uk: "Запитання" },
+  faqTitle: { en: "What people usually ask", ru: "Что обычно спрашивают", uk: "Що зазвичай запитують" },
+  faq1q: { en: "How much does it cost?", ru: "Сколько это стоит?", uk: "Скільки це коштує?" },
+  faq2q: { en: "What is a consultation?", ru: "Что такое консультация?", uk: "Що таке консультація?" },
+  faq3q: { en: "Can I change or cancel my booking?", ru: "Можно ли перенести или отменить запись?", uk: "Чи можна перенести або скасувати запис?" },
+  faq3a: { en: "Yes. After booking you get a personal link to change or cancel it.", ru: "Да. После записи вы получаете личную ссылку, по которой можно перенести или отменить визит.", uk: "Так. Після запису ви отримуєте особисте посилання, за яким можна перенести або скасувати візит." },
+  faq4q: { en: "Do I have to talk to the AI to book?", ru: "Нужно ли общаться с ИИ, чтобы записаться?", uk: "Чи потрібно спілкуватися зі ШІ, щоб записатися?" },
+  faq4a: { en: "No. You can pick a time and book directly. The assistant is only there if you want to ask something first.", ru: "Нет. Можно выбрать время и записаться напрямую. Ассистент нужен, только если вы хотите сначала о чём-то спросить.", uk: "Ні. Можна обрати час і записатися напряму. Асистент потрібен, лише якщо ви хочете спершу про щось запитати." },
+  finalTitle: { en: "Ready to choose a time?", ru: "Готовы выбрать время?", uk: "Готові обрати час?" },
+  finalText: { en: "It takes about a minute and needs no account", ru: "Это займёт около минуты и не требует аккаунта", uk: "Це займе близько хвилини й не потребує акаунта" },
+  footerDemo: { en: "Demonstration site. Photos, prices, technology description and reviews require the specialist's confirmation", ru: "Демонстрационный сайт. Фотографии, цены, описание технологии и отзывы требуют подтверждения мастером", uk: "Демонстраційний сайт. Фотографії, ціни, опис технології та відгуки потребують підтвердження майстром" },
+  privacy: { en: "Privacy", ru: "Конфиденциальность", uk: "Конфіденційність" },
+  // booking
+  bookTitle: { en: "Book a time", ru: "Запись на время", uk: "Запис на час" },
+  stepService: { en: "Service", ru: "Услуга", uk: "Послуга" },
+  stepTime: { en: "Time", ru: "Время", uk: "Час" },
+  stepDetails: { en: "Details", ru: "Данные", uk: "Дані" },
+  pickDay: { en: "Choose a day", ru: "Выберите день", uk: "Оберіть день" },
+  pickTime: { en: "Choose a time", ru: "Выберите время", uk: "Оберіть час" },
+  timesNote: { en: "Times are in Dublin time", ru: "Время указано по Дублину", uk: "Час вказано за Дубліном" },
+  loadingSlots: { en: "Loading free times", ru: "Загружаю свободное время", uk: "Завантажую вільний час" },
+  noSlots: { en: "No free times in the next weeks. Ask a question and the specialist will reply", ru: "На ближайшие недели свободного времени нет. Задайте вопрос, и мастер ответит", uk: "На найближчі тижні вільного часу немає. Поставте запитання, і майстер відповість" },
+  name: { en: "Your name", ru: "Ваше имя", uk: "Ваше ім'я" },
+  contact: { en: "Phone or email", ru: "Телефон или почта", uk: "Телефон або пошта" },
+  consentService: { en: "I agree that my name and contact are used to handle this booking", ru: "Согласен(на), что имя и контакт используются для этой записи", uk: "Погоджуюсь, що ім'я та контакт використовуються для цього запису" },
+  consentMarketing: { en: "I would also like occasional offers (optional)", ru: "Также хочу получать редкие предложения (необязательно)", uk: "Також хочу отримувати рідкісні пропозиції (необов'язково)" },
+  confirmBtn: { en: "Confirm booking", ru: "Подтвердить запись", uk: "Підтвердити запис" },
+  back: { en: "Back", ru: "Назад", uk: "Назад" },
+  next: { en: "Next", ru: "Далее", uk: "Далі" },
+  saving: { en: "Saving", ru: "Сохраняю", uk: "Зберігаю" },
+  doneTitle: { en: "Your time is booked", ru: "Время за вами", uk: "Час за вами" },
+  doneText: { en: "The booking is saved in the specialist's calendar.", ru: "Запись сохранена в календаре мастера.", uk: "Запис збережено в календарі майстра." },
+  doneMail: { en: "Email confirmations are not connected yet, so please save your personal link below.", ru: "Письма-подтверждения пока не подключены, поэтому сохраните личную ссылку ниже.", uk: "Листи-підтвердження поки не підключені, тому збережіть особисте посилання нижче." },
+  manageLink: { en: "Your personal link to change or cancel", ru: "Ваша личная ссылка для переноса или отмены", uk: "Ваше особисте посилання для перенесення або скасування" },
+  errTaken: { en: "This time was just taken. Please choose another one", ru: "Это время только что заняли. Выберите другое", uk: "Цей час щойно зайняли. Оберіть інший" },
+  errGeneric: { en: "We could not save the booking. Nothing was booked. Please try again", ru: "Не удалось сохранить запись. Ничего не забронировано. Попробуйте ещё раз", uk: "Не вдалося зберегти запис. Нічого не заброньовано. Спробуйте ще раз" },
+  errInvalid: { en: "Please check your name and contact", ru: "Проверьте имя и контакт", uk: "Перевірте ім'я та контакт" },
+  // chat
+  chatTitle: { en: "Ask a question", ru: "Задать вопрос", uk: "Поставити запитання" },
+  chatBadge: { en: "AI assistant · demo logic", ru: "ИИ-ассистент · демо-логика", uk: "ШІ-асистент · демо-логіка" },
+  chatPlaceholder: { en: "Write your question", ru: "Напишите вопрос", uk: "Напишіть запитання" },
+  chatSend: { en: "Send", ru: "Отправить", uk: "Надіслати" },
+  chatClose: { en: "Close", ru: "Закрыть", uk: "Закрити" },
+  chatError: { en: "The assistant is unavailable right now. You can still book a time directly", ru: "Ассистент сейчас недоступен. Записаться на время можно напрямую", uk: "Асистент зараз недоступний. Записатися на час можна напряму" },
+  chatHuman: { en: "Passed to the specialist", ru: "Передано мастеру", uk: "Передано майстру" },
+  chatBooked: { en: "Booked. Your personal link:", ru: "Записано. Ваша личная ссылка:", uk: "Записано. Ваше особисте посилання:" },
+  chatBookFail: { en: "I could not confirm this booking, so nothing is booked", ru: "Подтвердить запись не удалось, поэтому ничего не забронировано", uk: "Підтвердити запис не вдалося, тому нічого не заброньовано" },
+  // manage
+  manageTitle: { en: "Your booking", ru: "Ваша запись", uk: "Ваш запис" },
+  cancelBtn: { en: "Cancel booking", ru: "Отменить запись", uk: "Скасувати запис" },
+  cancelled: { en: "This booking is cancelled", ru: "Запись отменена", uk: "Запис скасовано" },
+  reschedBtn: { en: "Change time", ru: "Перенести", uk: "Перенести" },
+  reschedDone: { en: "Time changed", ru: "Время изменено", uk: "Час змінено" },
+  notFound: { en: "Booking not found", ru: "Запись не найдена", uk: "Запис не знайдено" },
+} satisfies Record<string, D>;
+
+export type Key = keyof typeof dict;
+export function t(loc: Loc, key: Key): string { return (dict[key] as D)[loc]; }
+export function dictFor(loc: Loc): Record<Key, string> {
+  return Object.fromEntries(Object.entries(dict).map(([k, v]) => [k, (v as D)[loc]])) as Record<Key, string>;
+}
