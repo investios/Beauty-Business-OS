@@ -2,7 +2,7 @@
   --ink: #1c1a19; --plum: #2b2623; --plum-strong: #171413; --rose-dust: #d9c8c8; --champagne: #c5b5a4;
   --ivory: #f7f4ef; --paper: #ffffff; --stone: #e2d9ce; --muted: #5d554e; --success: #276b51; --danger: #a13f4c;
   --accent: #7a6350; --soft: #f1ebe3;
-  --display: "Cormorant Garamond", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --display: "Playfair Display", "Cormorant Garamond", "Iowan Old Style", Georgia, "Times New Roman", serif;
   --ui: Manrope, Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --script: "Marck Script", "Segoe Script", cursive;
 }
