@@ -11,7 +11,7 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) process
 
   // 1. прямая запись без ИИ, с UTM
   await p.goto(BASE + "/ru?utm_source=instagram&utm_campaign=hair-density", { waitUntil: "networkidle" });
-  ok(await p.locator("h1").innerText() === "Индивидуальная работа с красотой ваших волос", "home H1 (no trailing dot)");
+  ok((await p.locator("h1").innerText()).includes("Наращивание, здоровье и восстановление волос"), "home H1");
   await p.getByRole("link", { name: "Выбрать время" }).first().click();
   await p.waitForURL("**/ru/book");
   await p.getByRole("button", { name: /Предварительная консультация/ }).click();
@@ -69,9 +69,9 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) process
 
   // 4. EN / UA тексты
   await p.goto(BASE + "/uk", { waitUntil: "networkidle" });
-  ok((await p.locator("h1").innerText()).includes("красою"), "UA home");
+  ok((await p.locator("h1").innerText()).includes("Нарощування"), "UA home");
   await p.goto(BASE + "/en", { waitUntil: "networkidle" });
-  ok((await p.locator("h1").innerText()).startsWith("Individual work"), "EN home");
+  ok((await p.locator("h1").innerText()).includes("Hair extensions"), "EN home");
   ok(errors.length === 0, "no browser console errors " + JSON.stringify(errors.slice(0, 3)));
   await ctx.close();
 
@@ -82,7 +82,7 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) process
   ok(true, "owner area redirects to login without session");
   await d.fill("#pw", "wrong"); await d.getByRole("button", { name: "Войти" }).click();
   await d.waitForSelector("text=Неверный пароль"); ok(true, "wrong password rejected");
-  await d.fill("#pw", "test-owner-pass"); await d.getByRole("button", { name: "Войти" }).click();
+  await d.fill("#pw", process.env.OWNER_PW || "test-owner-pass"); await d.getByRole("button", { name: "Войти" }).click();
   await d.waitForURL("**/owner/today");
   const today = await d.locator("main").innerText();
   ok(today.includes("Анна Тест") && today.includes("instagram"), "owner sees web booking with source instagram");

@@ -12,13 +12,15 @@
     "cf:preview": "opennextjs-cloudflare preview",
     "cf:deploy": "opennextjs-cloudflare deploy",
     "db:local": "wrangler d1 migrations apply beauty-os --local",
-    "db:remote": "wrangler d1 migrations apply beauty-os --remote"
+    "db:remote": "wrangler d1 migrations apply beauty-os --remote",
+    "guard": "tsc --noEmit && vitest run && node tests/e2e/lux.cjs && node tests/e2e/journey.cjs && PAGE=/{lang} node tests/e2e/chat.cjs"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.3.0",
     "@fontsource/jost": "^5.3.0",
     "@fontsource/literata": "^5.3.0",
     "@fontsource/manrope": "^5.3.0",
+    "@fontsource/marck-script": "^5.3.0",
     "@fontsource/onest": "^5.3.1",
     "@fontsource/prata": "^5.3.0",
     "@fontsource/spectral": "^5.3.0",

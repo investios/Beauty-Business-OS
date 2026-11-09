@@ -118,3 +118,40 @@ describe("approved knowledge only", () => {
     expect((await say("hello", "en")).engine).toBe("scripted-demo");
   });
 });
+
+describe("библиотека знаний + ИИ", () => {
+  it("мягкий образовательный вопрос о выпадении не эскалируется", () => expect(classify("Почему выпадают волосы?")[0]).toBe("education"));
+  it("тяжёлые признаки по-прежнему к мастеру", () => {
+    expect(classify("У меня сильно выпадают волосы")).toEqual(["medical"]);
+    expect(classify("Волосы выпадают очагами и болит кожа головы")).toEqual(["medical"]);
+    expect(classify("Внезапно начали выпадать волосы")).toEqual(["medical"]);
+    expect(classify("My hair is falling out a lot")).toEqual(["medical"]);
+  });
+  it("вопрос про вред наращивания → образовательный", () => expect(classify("Вредно ли наращивание для своих волос?")).toContain("education"));
+});
+
+describe("ответ ИИ по статье библиотеки", () => {
+  it("даёт выжимку, ссылку на статью, пометку «на утверждении», без диагноза и без передачи мастеру", async () => {
+    const r = await say("Почему выпадают волосы?");
+    expect(r.requiresHuman).toBe(false);
+    expect(r.articles?.[0].href).toBe("/ru/library/why-hair-falls-out");
+    expect(r.articles?.[0].draft).toBe(true);
+    expect(r.message).toMatch(/не диагноз/i);
+    expect(r.message).toMatch(/на утверждении/i);
+    expect(r.message).not.toMatch(/у вас (?:алопеция|телоген)|примите|принимайте|вылечит|гарантир/i);
+    expect(r.citations).toContain("library:why-hair-falls-out");
+  });
+  it("вопрос про вред наращивания ведёт к статье про тракцию", async () => {
+    const r = await say("Может ли наращивание навредить моим волосам?");
+    expect(r.articles?.[0].slug).toBe("can-extensions-damage-your-hair");
+  });
+  it("тот же вопрос на английском и украинском", async () => {
+    expect((await say("Why does hair fall out?", "en")).articles?.[0].href).toBe("/en/library/why-hair-falls-out");
+    expect((await say("Чому випадає волосся?", "uk")).articles?.[0].href).toBe("/uk/library/why-hair-falls-out");
+  });
+  it("тяжёлый случай не получает статью, а идёт к мастеру", async () => {
+    const r = await say("Волосы выпадают пучками и болит кожа головы");
+    expect(r.requiresHuman).toBe(true);
+    expect(r.articles).toBeUndefined();
+  });
+});

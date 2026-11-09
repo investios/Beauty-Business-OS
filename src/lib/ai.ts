@@ -1,13 +1,15 @@
 import { audit, js, nowIso, one, rows, uuid, type Db } from "./db";
 import { getAvailability, listServices } from "./booking";
 import { formatLocal, localParts, weekdayOfLocalDate } from "./tz";
+import { matchArticle } from "./library";
 
 export type Locale = "en" | "ru" | "uk";
-export type Intent = "medical" | "human" | "booking" | "price" | "technique" | "extensions" | "consultation" | "preparation" | "greeting" | "contact" | "unknown";
+export type Intent = "medical" | "human" | "booking" | "price" | "technique" | "extensions" | "consultation" | "preparation" | "greeting" | "contact" | "education" | "unknown";
 
 export type AiReply = {
   message: string; locale: Locale; intent: Intent; knowledgeVersion: number | null; citations: string[];
   slots?: { startUtc: string; label: string; serviceId: string }[];
+  articles?: { slug: string; title: string; href: string; draft: boolean }[];
   requiresHuman: boolean; handoffId?: string;
   toolResults: { tool: string; ok: boolean; detail?: string }[];
   // Честная маркировка: это сценарный движок на утверждённых карточках, НЕ языковая модель.
@@ -28,7 +30,9 @@ export function detectLocale(text: string, fallback: Locale): Locale {
 }
 
 /* ---------- намерение (простые правила; LLM-провайдер подключается вместо этого блока) ---------- */
-const MEDICAL = /(рeакци|реакц|сып|аллерг|алерг|ожог|опік|кров|болит|болить|боль\b|біль|зуд|свербі|воспал|запал|инфекц|інфекц|выпада|випада|лыс|облыс|давлен|беремен|вагітн|rash|allerg|itch|burn|bleed|infect|pain|hurts|swollen|swelling|inflam|pregnan|hair loss falling|scalp (?:condition|problem)|diagnos|діагноз|диагноз)/i;
+const MEDICAL = /(рeакци|реакц|сып|аллерг|алерг|ожог|опік|кров|болит|болить|боль\b|біль|зуд|свербі|воспал|запал|инфекц|інфекц|сильно\s+(?:выпада|випада)|(?:выпада|випада)\w*\s+(?:пучками|клочьями|клоч)|внезапн|раптов|резко\s+(?:выпа|випа)|очаг|осередк|проплешин|залысин|лыс|облыс|давлен|беремен|вагітн|rash|allerg|itch|burn|bleed|infect|pain|hurts|swollen|swelling|inflam|pregnan|hair loss falling|falling out a lot|losing a lot|sudden|patchy|bald|clumps|scalp (?:condition|problem)|diagnos|діагноз|диагноз)/i;
+/** Образовательные вопросы о выпадении и вреде наращивания: отвечаем кратко по статье библиотеки, без диагноза */
+const EDU = /(почему\s+выпада|причин\w*\s+(?:выпад|облыс)|выпадени|выпадают|выпадает|норм\w*\s+(?:выпад|потер)|сколько\s+волос|навредит|вредно|вредит|тракц|чому\s+випада|випадіння|випадає|випадають|скільки\s+волосин|зашкодит|шкідлив|шкодить|hair\s+(?:loss|fall|shedding|thinning)|shedding|thinning|damage\s+(?:my\s+)?(?:natural\s+)?hair|traction|are\s+extensions\s+bad|extensions\s+(?:damage|harm))/i;
 const HUMAN = /(живой человек|живого человека|мастер(?:у|ом)?\s+(?:напиш|позвон|передай)|поговорить с мастер|з людиною|з майстром|покличте|human|real person|speak to (?:someone|the specialist|a person)|talk to (?:someone|the specialist)|call me)/i;
 const BOOKING = /(запис|записат|записаться|book|appointment|reserve|free (?:time|slot)|available|свобод|вільн|окошк|вікн|slot|час(?:ы|ік)?\b.*(?:есть|можна)|когда можно|коли можна|пятниц|п'ятниц|понедел|понеділ|вторник|вівторок|сред[ау]|середа|четверг|четвер|суббот|субот|воскрес|неділ|monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i;
 const PRICE = /(цен[аыу]|стоим|сколько стоит|скільки кошту|вартість|ціна|прайс|price|cost|how much|fee|rate|€|евро|euro)/i;
@@ -43,6 +47,7 @@ export function classify(text: string): Intent[] {
   const out: Intent[] = [];
   if (MEDICAL.test(text)) return ["medical"];            // безопасность выше всего
   if (HUMAN.test(text)) return ["human"];
+  if (EDU.test(text)) out.push("education");
   if (PRICE.test(text)) out.push("price");
   if (BOOKING.test(text)) out.push("booking");
   if (TECH.test(text)) out.push("technique");
@@ -88,6 +93,10 @@ const T = {
   contactSaved: { en: "Thank you, I've added your contact to the request. The specialist will reply.", ru: "Спасибо, я добавил ваш контакт к обращению. Мастер ответит.", uk: "Дякую, я додав ваш контакт до звернення. Майстер відповість." },
   contactNoCase: { en: "Thanks. To book a time, choose a free slot on the booking page, or ask me for free times.", ru: "Спасибо. Чтобы записаться, выберите свободное время на странице записи или попросите меня показать время.", uk: "Дякую. Щоб записатися, оберіть вільний час на сторінці запису або попросіть мене показати час." },
   greeting: { en: "How can I help? You can ask about the consultation, the services or free times.", ru: "Чем могу помочь? Можно спросить про консультацию, услуги или свободное время.", uk: "Чим можу допомогти? Можна запитати про консультацію, послуги або вільний час." },
+  eduIntro: { en: "This is general educational information, not a diagnosis.", ru: "Это общая образовательная информация, а не диагноз.", uk: "Це загальна освітня інформація, а не діагноз." },
+  eduDraft: { en: "(the article is awaiting the specialist's approval)", ru: "(статья на утверждении у мастера)", uk: "(стаття на затвердженні в майстра)" },
+  eduRead: { en: "Read more in the knowledge library:", ru: "Подробнее в библиотеке знаний:", uk: "Детальніше в бібліотеці знань:" },
+  eduConsult: { en: "For personal advice, a consultation is best. If there is pain, inflammation, patches or sudden heavy shedding, please see a doctor.", ru: "Для индивидуальных рекомендаций лучше записаться на консультацию. При боли, воспалении, очагах или внезапном сильном выпадении обратитесь к врачу.", uk: "Для індивідуальних рекомендацій краще записатися на консультацію. За болю, запалення, осередків або раптового сильного випадіння зверніться до лікаря." },
   priceFrom: { en: "from", ru: "от", uk: "від" },
   priceConfirmed: { en: "Confirmed prices:", ru: "Подтверждённые цены:", uk: "Підтверджені ціни:" },
 };
@@ -130,11 +139,14 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
   const text = p.text.trim().slice(0, 1000);
   const locale = detectLocale(text, p.localeHint);
   const kbv = await activeKnowledge(db, p.tenantId);
-  const intents = classify(text);
+  let intents = classify(text);
+  const art = intents.includes("education") ? matchArticle(text, locale) : undefined;
+  if (intents.includes("education") && !art) { intents = intents.filter((i) => i !== "education"); if (!intents.length) intents = ["unknown"]; }
   const tools: AiReply["toolResults"] = [];
   const citations: string[] = [];
   const parts: string[] = [];
   let slots: AiReply["slots"];
+  let articles: AiReply["articles"];
   let requiresHuman = false;
   let handoffId: string | undefined;
 
@@ -159,6 +171,16 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
   } else if (primary === "greeting") {
     parts.push(T.greeting[locale]);
   } else {
+    // Образовательный вопрос: краткая выжимка статьи библиотеки + ссылка + предложение консультации
+    if (art && intents.includes("education")) {
+      const loc = art.langs[locale] ? locale : "ru";
+      const draft = art.status !== "approved";
+      parts.push([T.eduIntro[locale], art.aiSummary[locale], draft ? T.eduDraft[locale] : ""].filter(Boolean).join(" "));
+      articles = [{ slug: art.slug, title: art.langs[loc]!.title, href: `/${locale}/library/${art.slug}`, draft }];
+      citations.push(`library:${art.slug}`);
+      tools.push({ tool: "matchArticle", ok: true, detail: art.slug });
+      parts.push(T.eduConsult[locale]);
+    }
     // Сначала отвечаем на заданный вопрос — только из утверждённой версии знаний
     for (const topic of intents.filter((i) => ["price", "technique", "extensions", "consultation", "preparation"].includes(i))) {
       const a = article(kbv.snapshot, topic === "extensions" ? "extensions" : topic, locale);
@@ -173,7 +195,7 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
       }
     }
     // Слоты — только из реального календаря
-    const wantsSlots = intents.includes("booking") || intents.includes("price") || intents.includes("consultation");
+    const wantsSlots = intents.includes("booking") || intents.includes("price") || intents.includes("consultation") || intents.includes("education");
     if (wantsSlots) {
       const svc = (await listServices(db, p.tenantId)).find((s) => s.slug === "consultation");
       if (svc) {
@@ -182,7 +204,7 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
         const filtered = wd == null ? all : all.filter((s) => { const lp = localParts(new Date(s.startUtc).getTime()); return weekdayOfLocalDate(lp.y, lp.mo, lp.d) === wd; });
         const pick = (filtered.length ? filtered : []).slice(0, 4);
         tools.push({ tool: "getAvailability", ok: true, detail: `${pick.length} slots` });
-        if (pick.length && (intents.includes("booking") || intents.includes("consultation"))) {
+        if (pick.length && (intents.includes("booking") || intents.includes("consultation") || intents.includes("education"))) {
           slots = pick.map((s) => ({ startUtc: s.startUtc, label: formatLocal(new Date(s.startUtc).getTime(), locale), serviceId: svc.id }));
           parts.push(T.slotsIntro[locale] + " " + T.slotsPick[locale]);
         } else if (!pick.length && intents.includes("booking")) {
@@ -198,5 +220,5 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
 
   const message = parts.join("\n\n");
   await db.run("INSERT INTO messages(id,conversation_id,role,content,knowledge_version,meta,created_at) VALUES (?1,?2,'assistant',?3,?4,?5,?6)", [uuid(), conv.id, message, kbv.version, js({ intents, citations, tools, engine: "scripted-demo" }), nowIso()]);
-  return { message, locale, intent: primary, knowledgeVersion: kbv.version, citations, slots, requiresHuman, handoffId, toolResults: tools, engine: "scripted-demo" };
+  return { message, locale, intent: primary, knowledgeVersion: kbv.version, citations, slots, articles, requiresHuman, handoffId, toolResults: tools, engine: "scripted-demo" };
 }

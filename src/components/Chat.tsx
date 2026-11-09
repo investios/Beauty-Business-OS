@@ -4,7 +4,7 @@ import type { Key } from "@/lib/i18n";
 import { api, captureSource, newKey } from "@/lib/client";
 type Dict = Record<Key, string>;
 type Slot = { startUtc: string; label: string; serviceId: string };
-type Msg = { id: number; role: "bot" | "me" | "sys"; text: string; slots?: Slot[]; human?: boolean };
+type Msg = { id: number; role: "bot" | "me" | "sys"; text: string; slots?: Slot[]; human?: boolean; articles?: { slug: string; title: string; href: string }[] };
 
 export default function Chat({ locale, d }: { locale: "en" | "ru" | "uk"; d: Dict }) {
   const [open, setOpen] = useState(false);
@@ -57,7 +57,7 @@ export default function Chat({ locale, d }: { locale: "en" | "ru" | "uk"; d: Dic
       const r = await fetch(api(`ai/conversations/${convId}/messages`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: v, locale }) });
       if (!r.ok) throw new Error();
       const j = await r.json();
-      add({ role: "bot", text: j.message, slots: j.slots });
+      add({ role: "bot", text: j.message, slots: j.slots, articles: j.articles });
       if (j.requiresHuman) add({ role: "sys", text: d.chatHuman, human: true });
     } catch { add({ role: "sys", text: d.chatError }); }
     setBusy(false);
@@ -95,6 +95,11 @@ export default function Chat({ locale, d }: { locale: "en" | "ru" | "uk"; d: Dic
         {msgs.map((m) => (
           <div key={m.id} style={{ display: "contents" }}>
             <div className={`bubble ${m.role === "me" ? "me" : m.role === "bot" ? "bot" : "sys"}`}>{m.text}</div>
+            {m.articles && m.articles.length > 0 && (
+              <div className="chat-slots">
+                {m.articles.map((a) => <a key={a.slug} className="btn btn-secondary btn-sm" href={a.href} target="_blank" rel="noopener">{a.title}</a>)}
+              </div>
+            )}
             {m.slots && m.slots.length > 0 && (
               <div className="chat-slots">
                 {m.slots.map((s) => <button key={s.startUtc} type="button" className="btn btn-secondary btn-sm" onClick={() => setPick(s)}>{s.label}</button>)}
