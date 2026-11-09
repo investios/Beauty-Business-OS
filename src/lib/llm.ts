@@ -7,19 +7,20 @@ export const MODEL = "@cf/google/gemma-3-12b-it";
 export const HANDOFF_TOKEN = "[[HANDOFF]]";
 
 /** Вызов модели Cloudflare Workers AI (привязка AI). Если привязки нет или сбой — null, и работает сценарный движок. */
+export let lastLlmError = "";
 export async function runLlm(messages: ChatMsg[]): Promise<string | null> {
   try {
     const { getCloudflareContext } = await import("@opennextjs/cloudflare");
     const ctx = await getCloudflareContext({ async: true });
     const ai = (ctx.env as unknown as { AI?: { run: (m: string, p: unknown) => Promise<unknown> } }).AI;
-    if (!ai) return null;
+    if (!ai) { lastLlmError = "no AI binding"; return null; }
     const res = (await Promise.race([
       ai.run(MODEL, { messages, max_tokens: 420, temperature: 0.3 }),
       new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 25000)),
     ])) as { response?: string; choices?: { message?: { content?: string } }[] };
     const out = (res?.response ?? res?.choices?.[0]?.message?.content ?? "").trim();
     return out || null;
-  } catch { return null; }
+  } catch (e) { lastLlmError = String((e as Error)?.message ?? e).slice(0, 160); return null; }
 }
 
 const LANG: Record<Locale, string> = { ru: "русском", en: "English", uk: "українській" };
