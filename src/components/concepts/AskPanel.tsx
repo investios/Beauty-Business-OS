@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { AskButton } from "@/components/Chrome";
 
 type Opt = { id: string; label: string };
 type Card = { id: string; title: string; text: string };
@@ -22,7 +23,7 @@ export default function AskPanel({ options, cards, bookLabel, bookHref, moreLabe
             <p>{card.text}</p>
             <div className="cta-row">
               <a className="btn btn-primary" href={bookHref}>{bookLabel}</a>
-              <a className="btn btn-secondary" href="#faq">{moreLabel}</a>
+              <AskButton label={moreLabel} className="btn btn-secondary" />
             </div>
           </div>
         ) : <p className="ask-hint">{hint}</p>}

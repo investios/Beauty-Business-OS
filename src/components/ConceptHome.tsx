@@ -1,5 +1,8 @@
 import { COPY, type CLang, type Theme } from "@/lib/concept-copy";
 import ConceptBar from "./concepts/ConceptBar";
+import Chat from "./Chat";
+import { AskButton } from "./Chrome";
+import { dictFor } from "@/lib/i18n";
 
 /** Оригинальный декоративный рисунок прядей (не фото работ). Цвет задаётся темой. */
 function Strands() {
@@ -16,7 +19,7 @@ function Strands() {
 }
 
 export default function ConceptHome({ theme, lang }: { theme: Theme; lang: CLang }) {
-  const c = COPY[lang];
+  const c = COPY[lang], d = dictFor(lang);
   const heroBand = theme === "b" ? "band-light alt" : "band-dark";
   return (
     <div className="concept" data-theme={theme}>
@@ -115,7 +118,7 @@ export default function ConceptHome({ theme, lang }: { theme: Theme; lang: CLang
             <h2>{c.ctaTitle}</h2>
             <div className="cta-row center">
               <a className="btn btn-primary" href={`/${lang}/book`}>{c.book}</a>
-              <a className="btn btn-secondary" href="#faq">{c.questions}</a>
+              <AskButton label={d.ctaAsk} className="btn btn-secondary" />
             </div>
           </div>
         </section>
@@ -125,8 +128,10 @@ export default function ConceptHome({ theme, lang }: { theme: Theme; lang: CLang
       </footer>
       <div className="mbar">
         <a className="btn btn-primary" href={`/${lang}/book`}>{c.book}</a>
-        <a className="btn btn-secondary" href="#faq">{c.questions}</a>
+        <AskButton label={d.ctaAsk} className="btn btn-secondary" />
       </div>
+      <AskButton label={d.ctaAsk} className="btn btn-primary concept-fab" />
+      <Chat locale={lang} d={d} />
     </div>
   );
 }

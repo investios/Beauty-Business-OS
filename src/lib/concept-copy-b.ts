@@ -3,7 +3,7 @@
 import type { CLang } from "./concept-copy";
 export type BCopy = {
   askTitle: string; askHint: string; ask: { id: string; label: string }[];
-  threadLead: string; alsoIn: string;
+  threadLead: string; alsoIn: string; frame: string;
 };
 export const BCOPY: Record<CLang, BCopy> = {
   ru: {
@@ -15,7 +15,7 @@ export const BCOPY: Record<CLang, BCopy> = {
       { id: "consultation", label: "Волосы или кожа головы вызывают вопросы" },
       { id: "hair", label: "Ищу волосы для себя или для салона" },
     ],
-    threadLead: "От первого разговора до коррекции", alsoIn: "Что входит",
+    threadLead: "От первого разговора до коррекции", alsoIn: "Что входит", frame: "Фото работы",
   },
   en: {
     askTitle: "What would you like to change?", askHint: "Choose one and we will show you where to start.",
@@ -26,7 +26,7 @@ export const BCOPY: Record<CLang, BCopy> = {
       { id: "consultation", label: "I have questions about my hair or scalp" },
       { id: "hair", label: "I am looking for hair for myself or a salon" },
     ],
-    threadLead: "From the first conversation to your correction", alsoIn: "What is included",
+    threadLead: "From the first conversation to your correction", alsoIn: "What is included", frame: "Photo of our work",
   },
   uk: {
     askTitle: "Що ви хочете змінити?", askHint: "Оберіть, і ми покажемо, з чого почати.",
@@ -37,6 +37,6 @@ export const BCOPY: Record<CLang, BCopy> = {
       { id: "consultation", label: "Маю питання щодо волосся чи шкіри голови" },
       { id: "hair", label: "Шукаю волосся для себе чи для салону" },
     ],
-    threadLead: "Від першої розмови до корекції", alsoIn: "Що входить",
+    threadLead: "Від першої розмови до корекції", alsoIn: "Що входить", frame: "Фото роботи",
   },
 };

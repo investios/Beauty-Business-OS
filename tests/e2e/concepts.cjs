@@ -8,7 +8,7 @@ const OUT = process.env.OUT || "tests/e2e/shots-concepts";
   fs.mkdirSync(OUT, { recursive: true });
   const b = await chromium.launch();
   const problems = [];
-  for (const theme of (process.env.THEMES || "a,b,c,b1,b2,b3").split(",")) for (const lang of ["ru", "en", "uk"]) for (const [w, h, dsf] of [[320, 700, 1], [375, 800, 2], [768, 1000, 1], [1440, 900, 1]]) {
+  for (const theme of (process.env.THEMES || "d1,d2,d3").split(",")) for (const lang of ["ru", "en", "uk"]) for (const [w, h, dsf] of [[320, 700, 1], [375, 800, 2], [768, 1000, 1], [1440, 900, 1]]) {
     const ctx = await b.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dsf });
     const page = await ctx.newPage();
     await page.goto(`${BASE}/concepts/${theme}?lang=${lang}`, { waitUntil: "networkidle" });

@@ -1,4 +1,8 @@
 import { COPY, type CLang } from "@/lib/concept-copy";
+import { BCOPY } from "@/lib/concept-copy-b";
+import { dictFor } from "@/lib/i18n";
+import Chat from "@/components/Chat";
+import { AskButton } from "@/components/Chrome";
 
 export function Faq({ lang }: { lang: CLang }) {
   const c = COPY[lang];
@@ -10,7 +14,7 @@ export function Faq({ lang }: { lang: CLang }) {
 }
 
 export function Foot({ lang }: { lang: CLang }) {
-  const c = COPY[lang];
+  const c = COPY[lang], d = dictFor(lang);
   return (
     <>
       <footer className="foot band-dark">
@@ -18,8 +22,10 @@ export function Foot({ lang }: { lang: CLang }) {
       </footer>
       <div className="mbar">
         <a className="btn btn-primary" href={`/${lang}/book`}>{c.book}</a>
-        <a className="btn btn-secondary" href="#faq">{c.questions}</a>
+        <AskButton label={d.ctaAsk} className="btn btn-secondary" />
       </div>
+      <AskButton label={d.ctaAsk} className="btn btn-primary concept-fab" />
+      <Chat locale={lang} d={d} />
     </>
   );
 }
@@ -33,4 +39,9 @@ export function PhotoSlot({ lang }: { lang: CLang }) {
       <div className="ph"><span>{c.after}</span></div>
     </div>
   );
+}
+
+/** Рамка под реальное фото. Честно подписана: это место для фото, а не результат работы. */
+export function Frame({ lang, shape = "", note }: { lang: CLang; shape?: string; note?: string }) {
+  return <div className={`pf ${shape}`}><span>{note ?? BCOPY[lang].frame}</span></div>;
 }

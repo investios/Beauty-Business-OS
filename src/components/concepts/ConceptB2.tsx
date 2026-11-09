@@ -1,4 +1,5 @@
 import { COPY, type CLang } from "@/lib/concept-copy";
+import { dictFor } from "@/lib/i18n";
 import { BCOPY } from "@/lib/concept-copy-b";
 import ConceptBar from "./ConceptBar";
 import AskPanel from "./AskPanel";
@@ -23,7 +24,7 @@ export default function ConceptB2({ lang }: { lang: CLang }) {
 
         <section className="v2-ask" aria-labelledby="ask-h">
           <h2 id="ask-h">{b.askTitle}</h2>
-          <AskPanel options={b.ask} cards={c.cards} bookLabel={c.book} bookHref={`/${lang}/book`} moreLabel={c.questions} hint={b.askHint} />
+          <AskPanel options={b.ask} cards={c.cards} bookLabel={c.book} bookHref={`/${lang}/book`} moreLabel={dictFor(lang).ctaAsk} hint={b.askHint} />
         </section>
 
         <section className="v2-sec">
