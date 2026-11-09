@@ -7,6 +7,9 @@ type Dict = Record<Key, string>;
 type Slot = { startUtc: string; label: string; serviceId: string };
 type Msg = { id: number; role: "bot" | "me" | "sys"; text: string; slots?: Slot[]; human?: boolean; anim?: boolean; articles?: { slug: string; title: string; href: string }[] };
 
+const STORE = "mk-chat-v1";
+const KEEP_MS = 30 * 60 * 1000;
+const IDLE_MS = 60 * 1000;
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 /** Показывает текст по словам; для программ чтения с экрана выдаёт сразу весь текст */
 function Typed({ text }: { text: string }) {
@@ -56,6 +59,38 @@ export default function Chat({ locale, d }: { locale: "en" | "ru" | "uk"; d: Dic
     setMsgs((x) => x.map((m) => (m.id === id ? { ...m, anim: false, ...extra } : m)));
   }
 
+  const idleAsked = useRef(false);
+  const restored = useRef(false);
+
+  // Разговор живёт, пока открыта вкладка: переход на другую страницу сайта не сбрасывает чат
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(STORE);
+      if (raw) {
+        const st = JSON.parse(raw);
+        if (st.locale === locale && st.convId && Date.now() - st.last < KEEP_MS) {
+          const list: Msg[] = (st.msgs || []).map((m: Msg) => ({ ...m, anim: false }));
+          idRef.current = list.reduce((a, m) => Math.max(a, m.id), 0);
+          setConvId(st.convId); setMsgs(list); if (st.open) setOpen(true);
+        } else sessionStorage.removeItem(STORE);
+      }
+    } catch { /* без хранилища просто начинаем заново */ }
+    restored.current = true;
+  }, [locale]);
+  useEffect(() => {
+    if (!restored.current || !convId) return;
+    try { sessionStorage.setItem(STORE, JSON.stringify({ locale, convId, open, last: Date.now(), msgs: msgs.map((m) => ({ ...m, anim: false })) })); } catch { /* ignore */ }
+  }, [msgs, convId, open, locale]);
+
+  // Тишина в открытом чате: один раз спрашиваем, остались ли вопросы
+  useEffect(() => {
+    if (!open || !convId || busy || typing || text) return;
+    if (idleAsked.current || msgs.length === 0 || msgs[msgs.length - 1].role !== "bot") return;
+    const t = setTimeout(() => { idleAsked.current = true; void deliver(d.chatIdle); }, IDLE_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, convId, busy, typing, text, msgs]);
+
   useEffect(() => {
     const h = () => { trigger.current = document.activeElement as HTMLElement; setOpen(true); };
     window.addEventListener("open-chat", h);
@@ -63,6 +98,7 @@ export default function Chat({ locale, d }: { locale: "en" | "ru" | "uk"; d: Dic
   }, []);
   useEffect(() => {
     if (!open || convId) return;
+    if (!restored.current) return;
     (async () => {
       try {
         const r = await fetch(api("ai/conversations"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale, source: captureSource() }) });
@@ -87,7 +123,7 @@ export default function Chat({ locale, d }: { locale: "en" | "ru" | "uk"; d: Dic
     e.preventDefault();
     const v = text.trim();
     if (!v || !convId || busy) return;
-    setText(""); setBusy(true); add({ role: "me", text: v });
+    setText(""); setBusy(true); idleAsked.current = false; add({ role: "me", text: v });
     try {
       const r = await fetch(api(`ai/conversations/${convId}/messages`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: v, locale }) });
       if (!r.ok) throw new Error();
@@ -119,7 +155,14 @@ export default function Chat({ locale, d }: { locale: "en" | "ru" | "uk"; d: Dic
     setBusy(false);
   }
 
-  if (!open) return null;
+  if (!open) {
+    return (
+      <button type="button" className="chat-fab" onClick={() => { trigger.current = document.activeElement as HTMLElement; setOpen(true); }}>
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /></svg>
+        <span>{d.chatTitle}</span>
+      </button>
+    );
+  }
   return (
     <section className="chat-panel" role="dialog" aria-modal="true" aria-labelledby="chat-title">
       <div className="chat-head">

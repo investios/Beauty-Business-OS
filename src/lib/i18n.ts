@@ -73,6 +73,7 @@ const dict = {
   chatBadge: { en: "AI assistant · demo logic", ru: "ИИ-ассистент · демо-логика", uk: "ШІ-асистент · демо-логіка" },
   chatPlaceholder: { en: "Write your question", ru: "Напишите вопрос", uk: "Напишіть запитання" },
   chatSend: { en: "Send", ru: "Отправить", uk: "Надіслати" },
+  chatIdle: { en: "Do you have any other questions? If not, you can close this window or pick a time to book straight away.", ru: "Остались ли у вас ещё вопросы? Если нет, можно закрыть окно или сразу выбрать время для записи.", uk: "Чи залишилися у вас ще запитання? Якщо ні, можна закрити вікно або одразу обрати час для запису." },
   chatClose: { en: "Close", ru: "Закрыть", uk: "Закрити" },
   chatError: { en: "The assistant is unavailable right now. You can still book a time directly", ru: "Ассистент сейчас недоступен. Записаться на время можно напрямую", uk: "Асистент зараз недоступний. Записатися на час можна напряму" },
   chatHuman: { en: "Passed to the specialist", ru: "Передано мастеру", uk: "Передано майстру" },

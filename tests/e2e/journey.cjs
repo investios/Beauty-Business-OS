@@ -44,7 +44,7 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) process
   await p.goto(BASE + "/ru?utm_source=tiktok", { waitUntil: "networkidle" });
   await p.getByRole("button", { name: "Задать вопрос" }).first().click();
   await p.waitForSelector(".bubble.bot");
-  const settle = () => p.waitForFunction(() => !document.querySelector(".bubble.typing") && !document.querySelector(".chat-input button[type=submit]").disabled, null, { timeout: 40000 });
+  const settle = () => p.waitForFunction(() => !document.querySelector(".bubble.typing") && !document.querySelector(".chat-log [aria-hidden=true]") && !document.querySelector(".chat-input button[type=submit]").disabled, null, { timeout: 40000 });
   await settle();
   ok((await p.locator(".bubble.bot").allInnerTexts()).slice(0, 3).join(" ").includes("ИИ-ассистент"), "AI disclosure shown first");
   const say = async (t) => { const n = await p.locator(".bubble.bot").count(); await p.fill(".chat-input input", t); await p.keyboard.press("Enter"); await p.waitForFunction((k) => document.querySelectorAll(".bubble.bot").length > k, n, { timeout: 40000 }); await settle(); };

@@ -24,7 +24,7 @@ async function say(page, text) {
 }
 // ответ приходит по частям: ждём, пока исчезнет «печатает…» и снова станет доступна отправка
 async function settle(page) {
-  await page.waitForFunction(() => !document.querySelector(".bubble.typing") && !document.querySelector(".chat-input button[type=submit]").disabled, null, { timeout: 40000 });
+  await page.waitForFunction(() => !document.querySelector(".bubble.typing") && !document.querySelector(".chat-log [aria-hidden=true]") && !document.querySelector(".chat-input button[type=submit]").disabled, null, { timeout: 40000 });
 }
 (async () => {
   const b = await chromium.launch();
