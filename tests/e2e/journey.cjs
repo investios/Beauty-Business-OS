@@ -44,10 +44,12 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) process
   await p.goto(BASE + "/ru?utm_source=tiktok", { waitUntil: "networkidle" });
   await p.getByRole("button", { name: "Задать вопрос" }).first().click();
   await p.waitForSelector(".bubble.bot");
-  ok((await p.locator(".bubble.bot").first().innerText()).includes("ИИ-ассистент"), "AI disclosure shown first");
-  const say = async (t) => { await p.fill(".chat-input input", t); await p.keyboard.press("Enter"); await p.waitForTimeout(700); };
+  const settle = () => p.waitForFunction(() => !document.querySelector(".bubble.typing") && !document.querySelector(".chat-input button[type=submit]").disabled, null, { timeout: 40000 });
+  await settle();
+  ok((await p.locator(".bubble.bot").allInnerTexts()).slice(0, 3).join(" ").includes("ИИ-ассистент"), "AI disclosure shown first");
+  const say = async (t) => { const n = await p.locator(".bubble.bot").count(); await p.fill(".chat-input input", t); await p.keyboard.press("Enter"); await p.waitForFunction((k) => document.querySelectorAll(".bubble.bot").length > k, n, { timeout: 40000 }); await settle(); };
   await say("Сколько стоит?");
-  let txt = await p.locator(".bubble.bot").last().innerText();
+  let txt = (await p.locator(".bubble.bot").allInnerTexts()).slice(-3).join(" ");
   ok(!/€|евро|\d{2,}/i.test(txt) && /не подтвержд/.test(txt), "price: no invented amount");
   await say("Хочу записаться на пятницу");
   await p.waitForSelector(".chat-slots button");
@@ -62,7 +64,7 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) process
   await p.waitForSelector("text=Записано. Ваша личная ссылка");
   ok(true, "chat booking confirmed only after server OK");
   await say("После процедуры сильная реакция кожи и зуд");
-  txt = await p.locator(".bubble.bot").last().innerText();
+  txt = (await p.locator(".bubble.bot").allInnerTexts()).slice(-4).join(" ");
   ok(/не могу оценивать симптомы/.test(txt), "medical: safe escalation");
   await p.screenshot({ path: "tests/e2e/shots/390_chat_medical.png" });
   await p.getByRole("button", { name: "Закрыть" }).click();

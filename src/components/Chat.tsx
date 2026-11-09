@@ -2,10 +2,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { Key } from "@/lib/i18n";
 import { api, captureSource, newKey } from "@/lib/client";
+import { splitReply } from "@/lib/split-reply";
 type Dict = Record<Key, string>;
 type Slot = { startUtc: string; label: string; serviceId: string };
 type Msg = { id: number; role: "bot" | "me" | "sys"; text: string; slots?: Slot[]; human?: boolean; articles?: { slug: string; title: string; href: string }[] };
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 export default function Chat({ locale, d }: { locale: "en" | "ru" | "uk"; d: Dict }) {
   const [open, setOpen] = useState(false);
   const [convId, setConvId] = useState<string | null>(null);
@@ -19,7 +21,27 @@ export default function Chat({ locale, d }: { locale: "en" | "ru" | "uk"; d: Dic
   const keyRef = useRef(newKey());
   const inputRef = useRef<HTMLInputElement>(null);
   const trigger = useRef<HTMLElement | null>(null);
+  const [typing, setTyping] = useState(false);
+  const alive = useRef(true);
   const add = (m: Omit<Msg, "id">) => setMsgs((x) => [...x, { ...m, id: ++idRef.current }]);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+
+  /** Ответ показываем по частям, как живой человек: «печатает…», пауза по длине, затем следующая строка */
+  async function deliver(full: string, extra: Partial<Msg> = {}) {
+    const parts = splitReply(full);
+    const calm = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    for (let i = 0; i < parts.length; i++) {
+      if (!calm) {
+        setTyping(true);
+        await sleep(Math.min(1700, 450 + parts[i].length * 16));
+        if (!alive.current) return;
+        setTyping(false);
+      }
+      const last = i === parts.length - 1;
+      add({ role: "bot", text: parts[i], ...(last ? extra : {}) });
+      if (!last && !calm) await sleep(250);
+    }
+  }
 
   useEffect(() => {
     const h = () => { trigger.current = document.activeElement as HTMLElement; setOpen(true); };
@@ -33,12 +55,12 @@ export default function Chat({ locale, d }: { locale: "en" | "ru" | "uk"; d: Dic
         const r = await fetch(api("ai/conversations"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale, source: captureSource() }) });
         if (!r.ok) throw new Error();
         const j = await r.json();
-        setConvId(j.conversationId); add({ role: "bot", text: j.message });
+        setConvId(j.conversationId); await deliver(j.message);
       } catch { add({ role: "sys", text: d.chatError }); }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-  useEffect(() => { logRef.current?.scrollTo({ top: logRef.current.scrollHeight }); }, [msgs, pick]);
+  useEffect(() => { logRef.current?.scrollTo({ top: logRef.current.scrollHeight }); }, [msgs, pick, typing]);
   useEffect(() => {
     if (!open) return;
     inputRef.current?.focus();
@@ -57,9 +79,9 @@ export default function Chat({ locale, d }: { locale: "en" | "ru" | "uk"; d: Dic
       const r = await fetch(api(`ai/conversations/${convId}/messages`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: v, locale }) });
       if (!r.ok) throw new Error();
       const j = await r.json();
-      add({ role: "bot", text: j.message, slots: j.slots, articles: j.articles });
+      await deliver(j.message, { slots: j.slots, articles: j.articles });
       if (j.requiresHuman) add({ role: "sys", text: d.chatHuman, human: true });
-    } catch { add({ role: "sys", text: d.chatError }); }
+    } catch { setTyping(false); add({ role: "sys", text: d.chatError }); }
     setBusy(false);
   }
 
@@ -107,6 +129,7 @@ export default function Chat({ locale, d }: { locale: "en" | "ru" | "uk"; d: Dic
             )}
           </div>
         ))}
+        {typing && <div className="bubble bot typing" aria-hidden="true"><i /><i /><i /></div>}
         {pick && (
           <form className="chat-form" onSubmit={book}>
             <b>{pick.label}</b>

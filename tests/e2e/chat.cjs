@@ -20,6 +20,11 @@ async function say(page, text) {
   await page.locator(".chat-input input").fill(text);
   await page.locator(".chat-input button[type=submit]").click();
   await page.waitForFunction((n) => document.querySelectorAll(".bubble.bot").length > n, before, { timeout: 40000 });
+  await settle(page);
+}
+// ответ приходит по частям: ждём, пока исчезнет «печатает…» и снова станет доступна отправка
+async function settle(page) {
+  await page.waitForFunction(() => !document.querySelector(".bubble.typing") && !document.querySelector(".chat-input button[type=submit]").disabled, null, { timeout: 40000 });
 }
 (async () => {
   const b = await chromium.launch();
@@ -31,7 +36,10 @@ async function say(page, text) {
       check(await openChat(page, t), `${tag}: кнопка «${t.ask}» видна и нажимается`);
       await page.waitForSelector(".chat-panel", { timeout: 30000 });
       await page.waitForSelector(".bubble.bot", { timeout: 40000 });
+      await settle(page);
       check(true, `${tag}: чат открылся, есть приветствие`);
+      // приветствие и ответы выходят по частям, а не одним блоком
+      check(await page.locator(".bubble.typing").count() === 0, `${tag}: после ответа индикатор «печатает» убран`);
       const box = await page.locator(".chat-panel").boundingBox();
       check(box && box.x >= -1 && box.x + box.width <= vp.width + 1 && box.y >= -1 && box.y + box.height <= vp.height + 1, `${tag}: панель чата в границах экрана`);
       await say(page, t.q);
