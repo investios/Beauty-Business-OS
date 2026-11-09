@@ -2,7 +2,7 @@ import { audit, js, nowIso, one, rows, uuid, type Db } from "./db";
 import { getAvailability, listServices } from "./booking";
 import { formatLocal, localParts, weekdayOfLocalDate } from "./tz";
 import { matchArticle } from "./library";
-import { runLlm, lastLlmError, buildSystemPrompt, answerIsSafe, HANDOFF_TOKEN, type ChatMsg } from "./llm";
+import { runLlm, lastLlmError, lastModel, buildSystemPrompt, answerIsSafe, HANDOFF_TOKEN, type ChatMsg } from "./llm";
 
 export type Locale = "en" | "ru" | "uk";
 export type Intent = "medical" | "human" | "booking" | "price" | "technique" | "extensions" | "consultation" | "preparation" | "greeting" | "contact" | "education" | "unknown";
@@ -163,7 +163,7 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
     const msgs: ChatMsg[] = [{ role: "system", content: buildSystemPrompt(locale) }, ...hist.reverse().map((m) => ({ role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant", content: m.content }))];
     const out = await (p.llm ?? runLlm)(msgs);
     if (out && !out.includes(HANDOFF_TOKEN) && answerIsSafe(out)) llmText = out.slice(0, 1200);
-    tools.push({ tool: "llm", ok: !!llmText, detail: llmText ? "answered" : out ? "refused_or_unsafe" : "unavailable: " + lastLlmError });
+    tools.push({ tool: "llm", ok: !!llmText, detail: llmText ? "answered " + lastModel : out ? "refused_or_unsafe" : "unavailable: " + lastLlmError });
   }
   if (llmText) {
     engine = "llm-demo";

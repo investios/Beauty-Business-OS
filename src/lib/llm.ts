@@ -3,7 +3,9 @@ import { ARTICLES } from "./library";
 import type { Locale } from "./ai";
 
 export type ChatMsg = { role: "system" | "user" | "assistant"; content: string };
-export const MODEL = "@cf/google/gemma-3-12b-it";
+/** Модели по порядку: если одна недоступна для аккаунта, пробуем следующую */
+export const MODELS = ["@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/mistralai/mistral-small-3.1-24b-instruct", "@cf/meta/llama-3.1-8b-instruct"];
+export let lastModel = "";
 export const HANDOFF_TOKEN = "[[HANDOFF]]";
 
 /** Вызов модели Cloudflare Workers AI (привязка AI). Если привязки нет или сбой — null, и работает сценарный движок. */
@@ -14,11 +16,17 @@ export async function runLlm(messages: ChatMsg[]): Promise<string | null> {
     const ctx = await getCloudflareContext({ async: true });
     const ai = (ctx.env as unknown as { AI?: { run: (m: string, p: unknown) => Promise<unknown> } }).AI;
     if (!ai) { lastLlmError = "no AI binding"; return null; }
-    const res = (await Promise.race([
-      ai.run(MODEL, { messages, max_tokens: 420, temperature: 0.3 }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 25000)),
-    ])) as { response?: string; choices?: { message?: { content?: string } }[] };
-    const out = (res?.response ?? res?.choices?.[0]?.message?.content ?? "").trim();
+    let out = "";
+    for (const model of MODELS) {
+      try {
+        const res = (await Promise.race([
+          ai.run(model, { messages, max_tokens: 420, temperature: 0.3 }),
+          new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 25000)),
+        ])) as { response?: string; choices?: { message?: { content?: string } }[] };
+        out = (res?.response ?? res?.choices?.[0]?.message?.content ?? "").trim();
+        if (out) { lastModel = model; break; }
+      } catch (e) { lastLlmError = (model + ": " + String((e as Error)?.message ?? e)).slice(0, 200); }
+    }
     return out || null;
   } catch (e) { lastLlmError = String((e as Error)?.message ?? e).slice(0, 160); return null; }
 }
