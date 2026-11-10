@@ -155,3 +155,17 @@ describe("ответ ИИ по статье библиотеки", () => {
     expect(r.articles).toBeUndefined();
   });
 });
+
+describe("пожелания ко времени в диалоге", () => {
+  it("«на следующей неделе»: предлагает только реальные слоты следующей недели", async () => {
+    const r = await say("Хочу консультацию на следующей неделе");
+    expect(r.slots?.length).toBeGreaterThan(0);
+    for (const s of r.slots!) { const d = new Date(s.startUtc).toISOString().slice(0, 10); expect(d >= "2026-11-16" && d <= "2026-11-22").toBe(true); }
+  });
+  it("нет места на пожелание: честно говорит и показывает ближайшее реальное время, а не выдумывает", async () => {
+    const r = await say("Можно в воскресенье вечером?");
+    expect(r.message).toContain("свободного места нет");
+    expect(r.slots?.length).toBeGreaterThan(0);
+    expect(r.requiresHuman).toBe(false);
+  });
+});

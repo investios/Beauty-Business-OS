@@ -1,6 +1,7 @@
 import { audit, js, nowIso, one, rows, uuid, type Db } from "./db";
 import { getAvailability, listServices } from "./booking";
-import { formatLocal, localParts, weekdayOfLocalDate } from "./tz";
+import { formatLocal } from "./tz";
+import { hasPrefs, parseTimePrefs, slotMatches } from "./timeprefs";
 import { matchArticle } from "./library";
 import { runLlm, lastLlmError, lastModel, buildSystemPrompt, answerIsSafe, HANDOFF_TOKEN, type ChatMsg } from "./llm";
 
@@ -60,10 +61,6 @@ export function classify(text: string): Intent[] {
   return out.length ? out : ["unknown"];
 }
 
-const WEEKDAY: [RegExp, number][] = [
-  [/monday|понедел|понеділ/i, 1], [/tuesday|вторник|вівторок/i, 2], [/wednesday|сред[ау]|середа|середу/i, 3], [/thursday|четверг|четвер/i, 4],
-  [/friday|пятниц|п'ятниц|п’ятниц/i, 5], [/saturday|суббот|субот/i, 6], [/sunday|воскрес|неділ/i, 0],
-];
 
 /* ---------- тексты интерфейса диалога (не факты о мастере) ---------- */
 const T = {
@@ -73,6 +70,7 @@ const T = {
     uk: "Вітаю! Я ШІ-асистент цієї студії. Відповідаю за інформацією, затвердженою майстром, і можу показати реальний вільний час. Якщо не зможу відповісти, передам питання майстру. Записатися можна й напряму, без спілкування зі мною.",
   },
   slotsIntro: { en: "Here are the nearest free times:", ru: "Вот ближайшее свободное время:", uk: "Ось найближчий вільний час:" },
+  slotsNoMatch: { en: "I have nothing free at exactly that time.", ru: "На это время свободного места нет.", uk: "На цей час вільного місця немає." },
   slotsPick: { en: "Choose a time and I'll take you to the booking step.", ru: "Выберите время, и я перейду к оформлению записи.", uk: "Оберіть час, і я перейду до оформлення запису." },
   noSlots: { en: "I can't see free times for that request right now. I can pass this to the specialist so they can suggest a time — please leave a phone number or email.", ru: "Сейчас я не вижу свободного времени по этому запросу. Могу передать мастеру, чтобы он предложил время: оставьте телефон или почту.", uk: "Зараз я не бачу вільного часу за цим запитом. Можу передати майстру, щоб він запропонував час: залиште телефон або пошту." },
   consultQ: { en: "Would you like to see free times for a consultation?", ru: "Показать свободное время для консультации?", uk: "Показати вільний час для консультації?" },
@@ -214,14 +212,16 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
     if (wantsSlots) {
       const svc = (await listServices(db, p.tenantId)).find((s) => s.slug === "consultation");
       if (svc) {
-        const wd = WEEKDAY.find(([re]) => re.test(text))?.[1];
-        const all = await getAvailability(db, { tenantId: p.tenantId, serviceId: svc.id, now: p.now, days: 21 });
-        const filtered = wd == null ? all : all.filter((s) => { const lp = localParts(new Date(s.startUtc).getTime()); return weekdayOfLocalDate(lp.y, lp.mo, lp.d) === wd; });
-        const pick = (filtered.length ? filtered : []).slice(0, 4);
+        const prefs = parseTimePrefs(text, p.now ?? new Date());
+        const all = await getAvailability(db, { tenantId: p.tenantId, serviceId: svc.id, now: p.now, days: 60 });
+        const filtered = hasPrefs(prefs) ? all.filter((s) => slotMatches(new Date(s.startUtc).getTime(), prefs)) : all;
+        // На пожелание нет свободного времени: честно говорим об этом и показываем ближайшее из настоящего календаря
+        const fallback = hasPrefs(prefs) && filtered.length === 0 && all.length > 0;
+        const pick = (fallback ? all : filtered).slice(0, 4);
         tools.push({ tool: "getAvailability", ok: true, detail: `${pick.length} slots` });
         if (pick.length && (intents.includes("booking") || intents.includes("consultation") || intents.includes("education"))) {
           slots = pick.map((s) => ({ startUtc: s.startUtc, label: formatLocal(new Date(s.startUtc).getTime(), locale), serviceId: svc.id }));
-          parts.push(T.slotsIntro[locale] + " " + T.slotsPick[locale]);
+          parts.push((fallback ? T.slotsNoMatch[locale] + " " : "") + T.slotsIntro[locale] + " " + T.slotsPick[locale]);
         } else if (!pick.length && intents.includes("booking")) {
           handoffId = await handoff(db, p.tenantId, conv.id, "no_slots", text);
           requiresHuman = true;
