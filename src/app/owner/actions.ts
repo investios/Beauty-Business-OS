@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { BookingError, createBooking } from "@/lib/booking";
+import { BookingError, createBooking, ownerCancelBooking, ownerRescheduleBooking, ownerSetStatus, type OwnerStatus } from "@/lib/booking";
 import { zonedToUtc } from "@/lib/tz";
 import { ownerTenant } from "@/lib/auth";
 import { audit, getDb, nowIso } from "@/lib/db";
@@ -141,8 +141,38 @@ export async function manualBooking(fd: FormData) {
     await createBooking(db, {
       tenantId, serviceId: String(fd.get("service")), startsAtUtc: new Date((z as { utcMs: number }).utcMs).toISOString(),
       client: { name: String(fd.get("name") ?? ""), contact: String(fd.get("contact") ?? ""), locale: "ru" },
-      idempotencyKey: crypto.randomUUID(), consentService: fd.get("consent") === "1", source: { channel: "owner" }, ownerOverride: true,
+      idempotencyKey: crypto.randomUUID(), consentService: fd.get("consent") === "1", source: fd.get("test") === "1" ? { channel: "owner", test: "1" } : { channel: "owner" }, ownerOverride: true,
     });
   } catch (e) { code = e instanceof BookingError ? (e.code === "slot_taken" ? "taken" : e.code === "invalid" ? "bad_client" : "error") : "error"; }
   revalidatePath("/owner/schedule"); back(code);
+}
+
+/* ---------- Записи: подтвердить, перенести, отменить, отметить визит ---------- */
+const apptBack = (id: string, code: string) => redirect(`/owner/appointments/${id}?m=${code}`);
+export async function setApptStatus(fd: FormData) {
+  const { tenantId, db } = await guard();
+  const id = String(fd.get("id")), status = String(fd.get("status")) as OwnerStatus;
+  if (!["confirmed", "completed", "no_show"].includes(status)) apptBack(id, "error");
+  let code = "saved";
+  try { await ownerSetStatus(db, { tenantId, id, status }); } catch { code = "error"; }
+  revalidatePath("/owner/appointments"); apptBack(id, code);
+}
+export async function cancelAppt(fd: FormData) {
+  const { tenantId, db } = await guard();
+  const id = String(fd.get("id"));
+  let code = "cancelled";
+  try { await ownerCancelBooking(db, tenantId, id); } catch { code = "error"; }
+  revalidatePath("/owner/appointments"); apptBack(id, code);
+}
+export async function rescheduleAppt(fd: FormData) {
+  const { tenantId, db } = await guard();
+  const id = String(fd.get("id"));
+  const day = String(fd.get("day") ?? "").match(/^(\d{4})-(\d{2})-(\d{2})$/), min = toMin(fd.get("time"));
+  if (!day || min == null || min >= 1440) apptBack(id, "bad_time");
+  const z = zonedToUtc(+day![1], +day![2], +day![3], Math.floor(min! / 60), min! % 60);
+  if (z.status !== "ok") apptBack(id, "bad_time");
+  let code = "moved";
+  try { await ownerRescheduleBooking(db, { tenantId, id, newStartUtc: new Date((z as { utcMs: number }).utcMs).toISOString() }); }
+  catch (e) { code = e instanceof BookingError && e.code === "slot_taken" ? "taken" : "error"; }
+  revalidatePath("/owner/appointments"); apptBack(id, code);
 }

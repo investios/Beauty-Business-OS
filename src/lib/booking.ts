@@ -280,3 +280,48 @@ export async function createHold(db: Db, p: { tenantId: string; serviceId: strin
   }
   return { holdId: id, expiresAt: exp.toISOString() };
 }
+
+/* ---------- действия мастера над записями (кабинет): те же таблицы и защита от двойной записи ---------- */
+export type OwnerStatus = "confirmed" | "completed" | "no_show";
+export async function ownerSetStatus(db: Db, p: { tenantId: string; id: string; status: OwnerStatus }) {
+  const from = p.status === "confirmed" ? "('requested')" : "('confirmed')";
+  const r = await db.run(`UPDATE appointments SET status=?1, version=version+1 WHERE id=?2 AND tenant_id=?3 AND status IN ${from}`, [p.status, p.id, p.tenantId]);
+  if (r.changes !== 1) throw new BookingError("not_found", "appointment not found or status cannot be changed");
+  const au = auditStmt(p.tenantId, "owner", "booking." + p.status, p.id) as Stmt;
+  await db.run(au.sql, au.params);
+  return { status: p.status };
+}
+export async function ownerCancelBooking(db: Db, tenantId: string, id: string) {
+  const a = await one<{ status: string }>(db, "SELECT status FROM appointments WHERE id=?1 AND tenant_id=?2", [id, tenantId]);
+  if (!a) throw new BookingError("not_found", "booking not found");
+  if (a.status === "cancelled") return { status: "cancelled" };
+  await db.batch([
+    { sql: "UPDATE appointments SET status='cancelled', version=version+1 WHERE id=?1 AND tenant_id=?2 AND status IN ('requested','confirmed','held')", params: [id, tenantId] },
+    { sql: "UPDATE notifications SET status='cancelled' WHERE appointment_id=?1 AND status='queued'", params: [id] },
+    auditStmt(tenantId, "owner", "booking.cancel", id) as Stmt,
+  ]);
+  return { status: "cancelled" };
+}
+/** Мастер переносит запись на любое время: рабочие часы не проверяются, пересечение с другой записью по-прежнему невозможно */
+export async function ownerRescheduleBooking(db: Db, p: { tenantId: string; id: string; newStartUtc: string; now?: Date }) {
+  const now = p.now ?? new Date();
+  const a = await one<{ id: string; status: string; service_id: string }>(db, "SELECT id,status,service_id FROM appointments WHERE id=?1 AND tenant_id=?2", [p.id, p.tenantId]);
+  if (!a || !["confirmed", "requested"].includes(a.status)) throw new BookingError("not_found", "booking not found");
+  const start = new Date(p.newStartUtc);
+  if (isNaN(start.getTime())) throw new BookingError("invalid", "bad start");
+  const svc = (await one<{ duration_min: number; buffer_min: number }>(db, "SELECT duration_min,buffer_min FROM services WHERE id=?1", [a.service_id]))!;
+  const end = new Date(start.getTime() + svc.duration_min * 60000);
+  const blocked = new Date(end.getTime() + svc.buffer_min * 60000);
+  try {
+    await db.batch([
+      { sql: "UPDATE appointments SET start_at=?1,end_at=?2,blocked_until=?3,version=version+1 WHERE id=?4 AND tenant_id=?5 AND status IN ('confirmed','requested')", params: [start.toISOString(), end.toISOString(), blocked.toISOString(), a.id, p.tenantId] },
+      { sql: "UPDATE notifications SET status='cancelled' WHERE appointment_id=?1 AND status='queued'", params: [a.id] },
+      ...(new Date(start.getTime() - 24 * 3600000) > now ? [{ sql: "INSERT INTO notifications(id,tenant_id,appointment_id,kind,status,scheduled_for,created_at) VALUES (?1,?2,?3,'reminder_24h','queued',?4,?5)", params: [uuid(), p.tenantId, a.id, new Date(start.getTime() - 24 * 3600000).toISOString(), now.toISOString()] }] : []),
+      auditStmt(p.tenantId, "owner", "booking.reschedule", a.id) as Stmt,
+    ]);
+  } catch (e) {
+    if (isOverlap(e)) throw new BookingError("slot_taken", "This time is taken by another appointment");
+    throw e;
+  }
+  return { status: "confirmed", startsAtUtc: start.toISOString() };
+}

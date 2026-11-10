@@ -69,3 +69,32 @@ describe("расписание мастера", () => {
     await expect(createBooking(c.db, { tenantId: c.tenantId, serviceId: c.consult.id, startsAtUtc: start, client: person(3), idempotencyKey: key(), consentService: true, ownerOverride: true, now: NOW })).rejects.toBeInstanceOf(BookingError); // двойной записи нет
   });
 });
+
+import { ownerCancelBooking, ownerRescheduleBooking, ownerSetStatus } from "@/lib/booking";
+describe("действия владельца над записью", () => {
+  const book = async (c: Ctx) => {
+    const slot = (await avail(c))[0];
+    return createBooking(c.db, { tenantId: c.tenantId, serviceId: c.consult.id, startsAtUtc: slot.startUtc, client: person(), idempotencyKey: key(), consentService: true, now: NOW });
+  };
+  it("подтверждение допустимо только для requested, завершение только для confirmed", async () => {
+    const c = await setup(); const b = await book(c);
+    await expect(ownerSetStatus(c.db, { tenantId: c.tenantId, id: b.appointmentId, status: "confirmed" })).rejects.toBeInstanceOf(BookingError);
+    await ownerSetStatus(c.db, { tenantId: c.tenantId, id: b.appointmentId, status: "completed" });
+    const r = await c.db.all("SELECT status FROM appointments WHERE id=?1", [b.appointmentId]);
+    expect((r[0] as { status: string }).status).toBe("completed");
+  });
+  it("чужой салон не может менять запись", async () => {
+    const c = await setup(); const b = await book(c);
+    await expect(ownerCancelBooking(c.db, "other-tenant", b.appointmentId)).rejects.toBeInstanceOf(BookingError);
+  });
+  it("отмена освобождает слот, перенос занимает новый и не пересекается с чужой записью", async () => {
+    const c = await setup(); const b = await book(c);
+    const free = await avail(c); const target = free[3].startUtc;
+    await ownerRescheduleBooking(c.db, { tenantId: c.tenantId, id: b.appointmentId, newStartUtc: target, now: NOW });
+    const mv = await c.db.all("SELECT start_at FROM appointments WHERE id=?1", [b.appointmentId]);
+    expect((mv[0] as { start_at: string }).start_at).toBe(target);
+    expect((await avail(c)).some((x) => x.startUtc === target)).toBe(false);
+    await ownerCancelBooking(c.db, c.tenantId, b.appointmentId);
+    expect((await avail(c)).some((x) => x.startUtc === target)).toBe(true);
+  });
+});

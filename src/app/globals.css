@@ -250,3 +250,15 @@ textarea.kb { width: 100%; min-height: 96px; border: 1.5px solid #cbbfb2; border
 .sched-svc .field { margin: 0; }
 .sched-svc input { width: 120px; }
 @media (max-width: 600px) { .sched-row { grid-template-columns: 1fr; } }
+
+/* кабинет: записи */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chips a { min-height: 44px; display: inline-flex; align-items: center; padding: 0 16px; border-radius: 99px; border: 1.5px solid var(--stone); background: var(--paper); color: var(--ink); text-decoration: none; font: 600 14px var(--ui); }
+.chips a[aria-current="true"] { background: var(--plum); color: #fff; border-color: var(--plum); }
+.search { display: flex; gap: 8px; }
+.search input { flex: 1; min-height: 46px; border: 1.5px solid #cbbfb2; border-radius: 10px; padding: 8px 12px; font: 400 16px var(--ui); background: #fff; }
+.facts-list { margin: 0; display: grid; gap: 10px; }
+.facts-list div { display: grid; grid-template-columns: 150px 1fr; gap: 8px; }
+.facts-list dt { color: var(--muted); font-size: 14px; }
+.facts-list dd { margin: 0; font-weight: 600; }
+@media (max-width: 520px) { .facts-list div { grid-template-columns: 1fr; gap: 2px; } }

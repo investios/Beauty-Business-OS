@@ -120,6 +120,7 @@ export default async function Schedule({ searchParams }: { searchParams: Promise
               <label className="field"><span>Имя клиента</span><input type="text" name="name" required maxLength={100} autoComplete="off" /></label>
               <label className="field"><span>E-mail или телефон</span><input type="text" name="contact" required maxLength={120} autoComplete="off" /></label>
               <label className="check"><input type="checkbox" name="consent" value="1" /><span>Клиент согласен, что его контакт хранится для этой записи</span></label>
+              <label className="check"><input type="checkbox" name="test" value="1" /><span>Тестовая запись (демо): будет помечена «ТЕСТ» и не считается настоящей</span></label>
               <div className="row"><button className="btn btn-primary" type="submit">Записать</button></div>
             </form>
           </section>
