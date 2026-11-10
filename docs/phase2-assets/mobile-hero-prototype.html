@@ -1,0 +1,30 @@
+<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Прототип мобильного первого экрана (не production)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;1,500&family=Manrope:wght@400;600&display=swap">
+<style>
+:root{--ink:#1c1a19;--ivory:#f7f4ef;--stone:#e2d9ce;--plum:#2b2623}
+*{box-sizing:border-box;margin:0}body{background:var(--ivory);font:400 16px/1.5 Manrope,system-ui,sans-serif;color:var(--ink)}
+header{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid var(--stone)}
+.wm{font:500 26px/1 "Playfair Display",serif;white-space:nowrap}.wm small{font:italic 500 13px/1 "Playfair Display";margin-left:8px;border-left:1px solid var(--stone);padding-left:8px}
+.lang{display:flex;gap:6px;font-size:12px}.lang b{background:var(--ink);color:#fff;padding:6px 8px;border-radius:99px}
+.hero{position:relative}
+.ph{position:relative;height:min(44vh,330px);overflow:hidden}
+.ph img{width:100%;height:100%;object-fit:cover;object-position:50% 14%;display:block}
+.ph::after{content:"";position:absolute;inset:auto 0 0 0;height:55%;background:linear-gradient(to top,var(--ivory) 6%,transparent)}
+.nm{position:absolute;left:16px;bottom:-6px;z-index:2;font:italic 500 76px/1 "Playfair Display",serif;letter-spacing:-.02em}
+.tx{padding:8px 16px 0}
+h1{font:500 25px/1.15 "Playfair Display",serif;text-wrap:balance}
+.lead{margin-top:8px;font-size:15px;line-height:1.45;color:#3a342f;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.cta{display:grid;grid-template-columns:1.25fr 1fr;gap:8px;margin-top:14px}
+.btn{min-height:48px;border-radius:99px;font:600 14px/1.15 Manrope;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 10px}
+.p{background:var(--plum);color:#fff}.s{border:1.5px solid var(--ink)}
+</style>
+<header><div class="wm">MK<small>by Mila</small></div><div class="lang"><span>EN</span><b>RU</b><span>UA</span></div></header>
+<section class="hero">
+  <div class="ph"><img src="mila-hero-800.webp" alt="Мила"><div class="nm">Мила</div></div>
+  <div class="tx">
+    <h1>Наращивание, здоровье и восстановление волос</h1>
+    <p class="lead">Комплексный подход к красоте и здоровью ваших волос: от эстетики наращивания до понятного разбора того, что происходит с волосами и кожей головы.</p>
+    <div class="cta"><a class="btn p">Записаться на консультацию</a><a class="btn s">Спросить AI</a></div>
+  </div>
+</section>
