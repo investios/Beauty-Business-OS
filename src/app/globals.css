@@ -105,7 +105,7 @@ details p { padding: 0 20px 18px; color: var(--muted); }
 @media (min-width: 900px) { .sticky { display: none; } .site-footer { padding-bottom: 36px; } }
 
 /* booking */
-.page { padding: 28px 0 100px; }
+.page { padding: 28px 0 56px; }
 .crumbs { display: flex; gap: 8px; margin: 18px 0 24px; padding: 0; list-style: none; flex-wrap: wrap; }
 .crumbs li { font: 700 12px var(--ui); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 8px 12px; border-radius: 99px; border: 1px solid var(--stone); background: var(--paper); }
 .crumbs li[aria-current="step"] { background: var(--plum); color: #fff; border-color: var(--plum); }
@@ -134,13 +134,14 @@ details p { padding: 0 20px 18px; color: var(--muted); }
 .cal-nav:disabled { opacity: .3; cursor: default; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .cal-wd { text-align: center; font: 700 12px var(--ui); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); padding: 4px 0 6px; }
-.cal-cell { min-height: 52px; border-radius: 12px; border: 1.5px solid transparent; background: transparent; font: 500 17px var(--ui); color: #a79c92; display: grid; place-items: center; padding: 0; }
-.cal-cell.empty { visibility: hidden; }
-.cal-cell.today:not(.free) { border-color: var(--stone); }
+.cal-cell { min-height: 52px; border-radius: 12px; border: 1.5px solid var(--stone); background: #faf8f5; font: 500 17px var(--ui); color: #8d8279; display: grid; place-items: center; padding: 0; }
+.cal-blank { min-height: 52px; }
+.cal-cell.today:not(.free) { border-color: var(--plum); }
 .cal-cell.free { cursor: pointer; background: var(--soft); border-color: var(--champagne); color: var(--plum); font-weight: 700; }
 .cal-cell.free:hover { border-color: var(--plum); }
 .cal-cell.free[aria-pressed="true"] { background: var(--plum); border-color: var(--plum); color: #fff; }
-.cal-legend { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; font-size: 14px; color: var(--muted); }
+.cal-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 8px; margin: 12px 0 0; font-size: 14px; color: var(--muted); }
+.cal-legend i.off { margin-left: 14px; background: #faf8f5; border-color: var(--stone); }
 .cal-legend i { width: 18px; height: 18px; border-radius: 6px; background: var(--soft); border: 1.5px solid var(--champagne); flex: none; }
 .linklike { background: none; border: 0; padding: 8px 0; font: 700 15px var(--ui); color: var(--plum); text-decoration: underline; cursor: pointer; min-height: 44px; }
 .times-box { scroll-margin-bottom: 16px; }

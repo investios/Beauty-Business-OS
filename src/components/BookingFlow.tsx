@@ -7,7 +7,7 @@ type Svc = { id: string; slug: string; title: string; desc: string; duration: nu
 type Slot = { startUtc: string; endUtc: string; label: string };
 type Done = { id: string; token: string; startsAtUtc: string; delivery: string };
 
-const HORIZON = 120; // дней вперёд: запись на 2–3 недели и повторные визиты на 3 месяца
+const HORIZON = 183; // полгода вперёд: запись на 2–3 недели и повторные визиты на 3 месяца и дальше
 const pad = (n: number) => String(n).padStart(2, "0");
 const keyOf = (y: number, m: number, d: number) => `${y}-${pad(m)}-${pad(d)}`;
 const bcp = (loc: string) => (loc === "uk" ? "uk-UA" : loc === "ru" ? "ru-RU" : "en-IE");
@@ -45,12 +45,12 @@ function Calendar({ locale, d, free, value, onPick }: { locale: string; d: Dict;
       <div className="cal-grid" role="group" aria-label={title}>
         {wds.map((w) => <span key={w} className="cal-wd">{w}</span>)}
         {cells.map((n, i) => {
-          if (!n) return <span key={i} className="cal-cell empty" />;
+          if (!n) return <span key={i} className="cal-blank" aria-hidden="true" />;
           const k = keyOf(view.y, view.m, n), ok = free.has(k);
           return <button key={i} type="button" className={`cal-cell${ok ? " free" : ""}${k === todayKey ? " today" : ""}`} disabled={!ok} aria-pressed={ok ? k === value : undefined} aria-label={longDay(k)} onClick={() => onPick(k)}>{n}</button>;
         })}
       </div>
-      <p className="cal-legend"><i aria-hidden="true" />{d.calLegend}</p>
+      <p className="cal-legend"><i aria-hidden="true" />{d.calLegend}<i className="off" aria-hidden="true" />{d.calBusy}</p>
       {!monthFree && free.size > 0 && (
         <p className="hint"><span>{d.calEmptyMonth}. </span>
           <button type="button" className="linklike" onClick={() => setView({ y: Number(firstFree.slice(0, 4)), m: Number(firstFree.slice(5, 7)) })}>{d.calNearest}</button></p>

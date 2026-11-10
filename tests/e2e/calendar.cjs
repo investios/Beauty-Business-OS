@@ -29,8 +29,8 @@ const check = (c, m) => (c ? ok : fails).push(m);
       check(await next.isEnabled(), `${tag}: «Далее» активна после выбора времени`);
       // листание вперёд до границы 4 месяцев
       let n = 0; const nx = page.locator(".cal-nav").nth(1);
-      while (await nx.isEnabled() && n < 8) { await nx.click(); n++; }
-      check(n >= 3 && n <= 5, `${tag}: можно листать вперёд примерно на 4 месяца (${n})`);
+      while (await nx.isEnabled() && n < 10) { await nx.click(); n++; }
+      check(n >= 5 && n <= 7, `${tag}: можно листать вперёд примерно на полгода (${n})`);
       check(await page.locator(".cal-nav").first().isEnabled(), `${tag}: можно вернуться назад`);
       while (await page.locator(".cal-nav").first().isEnabled()) await page.locator(".cal-nav").first().click();
       check(await page.locator(".cal-nav").first().isDisabled(), `${tag}: в прошлое листать нельзя`);

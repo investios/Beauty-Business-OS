@@ -38,7 +38,7 @@ async function route(req: Request, ctx: Ctx, method: "GET" | "POST") {
     }
     if (method === "GET" && seg === "availability") {
       const serviceId = z.string().uuid().parse(url.searchParams.get("serviceId"));
-      const days = Math.min(Number(url.searchParams.get("days") ?? 28) || 28, 130);
+      const days = Math.min(Number(url.searchParams.get("days") ?? 28) || 28, 190);
       const locale = loc.catch("en").parse(url.searchParams.get("locale"));
       const slots = await getAvailability(db, { tenantId: tenant.id, serviceId, days });
       return json({ timezone: tenant.timezone, slots: slots.map((s) => ({ startUtc: s.startUtc, endUtc: s.endUtc, label: formatLocal(new Date(s.startUtc).getTime(), locale) })) });
