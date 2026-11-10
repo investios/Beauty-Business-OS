@@ -207,4 +207,4 @@ details p { color: #4a423c; }
 .chat-fab { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 45; display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--plum); color: #fff; font: 600 15px/1 var(--sans, inherit); box-shadow: 0 8px 28px rgba(28, 26, 25, .28); cursor: pointer; }
 .chat-fab:hover { background: var(--plum-strong); }
 .chat-fab:focus-visible { outline: 3px solid var(--champagne); outline-offset: 3px; }
-@media (max-width: 899px) { body:has(.sticky.on) .chat-fab { bottom: calc(86px + env(safe-area-inset-bottom)); } }
+@media (max-width: 899px) { body:has(.sticky) .chat-fab { display: none; } body:has(.sticky) .site-footer { padding-bottom: 104px; } }

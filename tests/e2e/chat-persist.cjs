@@ -3,6 +3,7 @@ const { chromium } = require("playwright");
 const BASE = process.env.BASE_URL || "http://localhost:3000";
 let fails = 0; const check = (c, m) => { console.log(c ? "ok  " : "FAIL", m); if (!c) fails++; };
 const settle = (p) => p.waitForFunction(() => !document.querySelector(".bubble.typing") && !document.querySelector(".chat-log [aria-hidden=true]") && !!document.querySelector(".chat-input button[type=submit]") && !document.querySelector(".chat-input button[type=submit]").disabled, null, { timeout: 60000 });
+const askSel = (vp, path) => (vp.width < 900 && !/\/(book|manage)/.test(path)) ? ".sticky .btn-secondary" : ".chat-fab";
 (async () => {
   const b = await chromium.launch();
   for (const [name, vp] of [["desktop", { width: 1440, height: 900 }], ["mobile", { width: 375, height: 800 }]]) {
@@ -10,12 +11,13 @@ const settle = (p) => p.waitForFunction(() => !document.querySelector(".bubble.t
     // кнопка есть на всех типах страниц
     for (const path of ["/ru", "/ru/services", "/ru/services/trichology", "/ru/library", "/ru/library/why-hair-falls-out", "/ru/about", "/ru/results", "/ru/contact", "/ru/book", "/uk", "/en/library"]) {
       await p.goto(BASE + path, { waitUntil: "domcontentloaded" });
-      await p.waitForSelector(".chat-fab", { timeout: 15000 }).catch(() => {});
-      const box = await p.locator(".chat-fab").boundingBox().catch(() => null);
+      await p.waitForSelector(askSel(vp, path), { timeout: 15000 }).catch(() => {});
+      const box = await p.locator(askSel(vp, path)).boundingBox().catch(() => null);
+      check(await p.locator(".sticky .btn-secondary:visible, .chat-fab:visible").count() === 1, `${name} ${path}: ровно одна кнопка «Задать вопрос»`);
       check(!!box && box.x >= 0 && box.x + box.width <= vp.width && box.y + box.height <= vp.height, `${name} ${path}: кнопка консультанта видна и в границах экрана`);
     }
     await p.goto(BASE + "/ru/services/trichology", { waitUntil: "networkidle" });
-    await p.locator(".chat-fab").click();
+    await p.locator(askSel(vp, "/ru/services/trichology")).click();
     await p.waitForSelector(".bubble.bot"); await settle(p);
     await p.fill(".chat-input input", "Безопасно ли наращивание волос?"); await p.keyboard.press("Enter");
     await settle(p);
@@ -34,10 +36,10 @@ const settle = (p) => p.waitForFunction(() => !document.querySelector(".bubble.t
     // закрыли чат и перешли — остаётся закрытым, но кнопка есть и история на месте
     await p.keyboard.press("Escape");
     await p.goto(BASE + "/ru/about", { waitUntil: "networkidle" });
-    check(await p.locator(".chat-panel").count() === 0 && await p.locator(".chat-fab").count() === 1, `${name}: закрытый чат не открывается сам`);
+    check(await p.locator(".chat-panel").count() === 0 && await p.locator(askSel(vp, "/ru/about")).isVisible(), `${name}: закрытый чат не открывается сам`);
     // другой язык: диалог начинается заново
     await p.goto(BASE + "/en", { waitUntil: "networkidle" });
-    await p.locator(".chat-fab").click(); await p.waitForSelector(".bubble.bot"); await settle(p);
+    await p.locator(askSel(vp, "/en")).click(); await p.waitForSelector(".bubble.bot"); await settle(p);
     check(await p.locator(".chat-log .bubble.me").count() === 0, `${name}: при смене языка диалог новый`);
     await ctx.close();
   }
