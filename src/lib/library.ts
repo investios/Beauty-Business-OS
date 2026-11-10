@@ -3,7 +3,7 @@ import { ARTICLES } from "./library-articles";
 
 export type Cat = "trichology" | "recovery" | "extensions" | "care";
 export type Block = { t: "h2" | "p"; text: string } | { t: "ul"; items: string[] };
-export interface Source { title: string; publisher: string; url: string; year?: string; note?: string }
+export interface Source { title: string; publisher: string; url: string; year?: string; note?: string; /** общий справочный источник: не показывается читателю */ general?: boolean }
 export interface Localized { title: string; excerpt: string; body: Block[]; faq: { q: string; a: string }[] }
 export type Tier = 1 | 2 | 3 | 4; // 1 утверждено владельцем · 2 документация производителя · 3 медицина/университеты/рецензируемое · 4 общее
 export interface Article {

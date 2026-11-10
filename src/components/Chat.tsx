@@ -176,7 +176,7 @@ export default function Chat({ locale, d }: { locale: "en" | "ru" | "uk"; d: Dic
             <div className={`bubble ${m.role === "me" ? "me" : m.role === "bot" ? "bot" : "sys"}`}>{m.anim ? <Typed text={m.text} /> : m.text}</div>
             {m.articles && m.articles.length > 0 && (
               <div className="chat-slots">
-                {m.articles.map((a) => <a key={a.slug} className="btn btn-secondary btn-sm" href={a.href} target="_blank" rel="noopener">{a.title}</a>)}
+                {m.articles.map((a) => <a key={a.slug} className="btn btn-secondary btn-sm" href={a.href}>{a.title}</a>)}
               </div>
             )}
             {m.slots && m.slots.length > 0 && (

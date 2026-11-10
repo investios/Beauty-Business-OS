@@ -21,10 +21,11 @@ export default async function ArticlePage({ params }: { params: Promise<{ locale
   const { content, fallback } = localize(a, locale);
   const rel = a.related.map((s) => ARTICLES.find((x) => x.slug === s)).filter((x) => !!x);
   const hub = a.hub as HubId;
+  const shown = a.sources.filter((s) => !s.general); // общие справочные сведения без ссылок на чужие сайты
   const ld = {
     "@context": "https://schema.org", "@type": "Article", headline: content.title, description: content.excerpt, inLanguage: locale === "uk" ? "uk" : locale,
     dateModified: a.updated, author: { "@type": "Person", name: "Mila" }, publisher: { "@type": "Organization", name: "MK Extension Studio by Mila" },
-    citation: a.sources.map((s) => s.url),
+    citation: shown.map((s) => `${s.title}, ${s.publisher}${s.year ? `, ${s.year}` : ""}`),
   };
   const faqLd = content.faq.length ? { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: content.faq.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) } : null;
   return (
@@ -41,9 +42,9 @@ export default async function ArticlePage({ params }: { params: Promise<{ locale
         {content.body.map((b, i) => b.t === "ul" ? <ul key={i}>{b.items.map((x) => <li key={x}>{x}</li>)}</ul> : b.t === "h2" ? <h2 key={i}>{b.text}</h2> : <p key={i}>{b.text}</p>)}
         <p className="disclaimer">{l.disclaimer}</p>
         {content.faq.length > 0 && <section><h2>{l.faq}</h2><div className="faq">{content.faq.map((f) => <details key={f.q}><summary>{f.q}</summary><p>{f.a}</p></details>)}</div></section>}
-        <section className="sources"><h2 style={{ marginTop: 0 }}>{l.sources}</h2>
-          <ol>{a.sources.map((s) => <li key={s.url}><a href={s.url} rel="noopener noreferrer" target="_blank">{s.title}</a>, {s.publisher}{s.year ? `, ${s.year}` : ""}</li>)}</ol>
-        </section>
+        {shown.length > 0 && <section className="sources"><h2 style={{ marginTop: 0 }}>{l.sources}</h2>
+          <ol>{shown.map((s) => <li key={s.title}>{s.title}, {s.publisher}{s.year ? `, ${s.year}` : ""}</li>)}</ol>
+        </section>}
         <div className="pg-cta">
           <a className="btn btn-primary" href={`/${locale}/book?service=${HUB_SERVICE[hub] ?? "consultation"}`}>{d.ctaBook}</a>
           <AskButton label={c.hubLabels.ask} className="btn btn-secondary" />

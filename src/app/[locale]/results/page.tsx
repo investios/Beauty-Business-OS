@@ -7,7 +7,7 @@ import { AskButton } from "@/components/Chrome";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params; if (!isLoc(locale)) return {};
-  return { title: SC[locale].results.title, description: SC[locale].results.lead, alternates: altFor(locale, "/results"), robots: robotsFor(true) };
+  return { title: SC[locale].results.title, description: `${SC[locale].results.lead} ${SC[locale].results.empty}`.slice(0, 160), alternates: altFor(locale, "/results"), robots: robotsFor(true) };
 }
 export default async function Results({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;

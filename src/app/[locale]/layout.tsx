@@ -15,7 +15,7 @@ import "@fontsource/manrope/700.css";
 import "@fontsource/marck-script/400.css";
 import "../globals.css";
 import "../luxury.css";
-import { altFor, robotsFor } from "@/lib/seo";
+import { altFor, robotsFor, SITE_URL } from "@/lib/seo";
 import { HTML_LANG, LOCALES, dictFor, isLoc, t } from "@/lib/i18n";
 import { SC } from "@/lib/site-copy";
 import Chat from "@/components/Chat";
@@ -28,9 +28,12 @@ export function generateStaticParams() { return LOCALES.map((locale) => ({ local
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
   if (!isLoc(locale)) return {};
+  const TITLE = { ru: "Наращивание и восстановление волос · MK Extension Studio", en: "Hair extensions and hair health · MK Extension Studio", uk: "Нарощування та відновлення волосся · MK Extension Studio" }[locale];
   return {
-    title: { default: `MK Extension Studio by Mila · ${SC[locale].hero.title}`, template: "%s · MK Extension Studio by Mila" },
+    title: { default: TITLE, template: "%s · MK Extension Studio" },
     description: SC[locale].hero.text,
+    openGraph: { type: "website", siteName: "MK Extension Studio by Mila", title: TITLE, description: SC[locale].hero.text, locale: HTML_LANG[locale].replace("-", "_"), url: `${SITE_URL}/${locale}` },
+    twitter: { card: "summary", title: TITLE, description: SC[locale].hero.text },
     robots: robotsFor(true), // демо: не индексируется, пока не включён SITE_INDEXABLE=1 (см. src/lib/seo.ts)
     alternates: altFor(locale, ""),
   };

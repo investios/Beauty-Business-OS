@@ -4,7 +4,7 @@ import type { Article } from "./library";
  * Пилотные статьи. Статус: draft (на утверждении у Милы), ownerReviewed: false.
  * Факты взяты из источников ниже; медицинских обещаний и диагнозов нет.
  */
-const MAYO = { title: "Hair loss: Symptoms and causes", publisher: "Mayo Clinic", url: "https://www.mayoclinic.org/diseases-conditions/hair-loss/symptoms-causes/syc-20372926", year: "2026 (обновлено 8 февраля)", tier: 3 as const };
+const MAYO = { title: "Hair loss: Symptoms and causes", publisher: "Mayo Clinic", url: "https://www.mayoclinic.org/diseases-conditions/hair-loss/symptoms-causes/syc-20372926", year: "2026 (обновлено 8 февраля)", tier: 3 as const, general: true };
 const TE = { title: "Telogen Effluvium", publisher: "StatPearls (NCBI Bookshelf)", url: "https://www.ncbi.nlm.nih.gov/books/NBK430848/", tier: 3 as const, note: "Сроки при telogen effluvium перед утверждением перепроверить по полному тексту (страница при проверке не открылась)." };
 const TRACTION = { title: "Traction alopecia: the root of the problem", publisher: "Billero V, Miteva M. Clin Cosmet Investig Dermatol 11:149–159", url: "https://www.dovepress.com/traction-alopecia-the-root-of-the-problem-peer-reviewed-fulltext-article-CCID", year: "2018", tier: 3 as const };
 
