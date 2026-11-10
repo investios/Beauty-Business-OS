@@ -207,4 +207,77 @@ details p { color: #4a423c; }
 .chat-fab { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 45; display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--plum); color: #fff; font: 600 15px/1 var(--sans, inherit); box-shadow: 0 8px 28px rgba(28, 26, 25, .28); cursor: pointer; }
 .chat-fab:hover { background: var(--plum-strong); }
 .chat-fab:focus-visible { outline: 3px solid var(--champagne); outline-offset: 3px; }
-@media (max-width: 899px) { body:has(.sticky) .chat-fab { display: none; } body:has(.sticky) .site-footer { padding-bottom: 104px; } }
+@media (max-width: 899px) { body:has(.sticky) .chat-fab { display: none; } }
+
+/* ===== PR-1: мобильная композиция (до 899 px). Десктоп не затрагивается ===== */
+.m-only { display: none; }
+@media (max-width: 899px) {
+  .d-only { display: none !important; }
+  .m-only { display: inline-flex; }
+
+  /* логотип в одну строку */
+  .wordmark { white-space: nowrap; }
+  .wm-txt b { display: none; }
+  .wm-txt { padding-left: 8px; }
+
+  /* первый экран: фото с лицом сверху, имя поверх фото, затем оффер и главное действие */
+  .lx-hero { padding-bottom: 18px; }
+  .lx-hero .wrap { display: flex; flex-direction: column; }
+  .lx-hero-copy, .lx-photo { display: contents; }
+  .lx-photo picture { order: 0; display: block; position: relative; margin: 0 calc(50% - 50vw); height: clamp(190px, 38svh, 360px); }
+  .lx-photo img { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; object-position: 50% 12%; -webkit-mask-image: linear-gradient(to bottom, #000 68%, transparent); mask-image: linear-gradient(to bottom, #000 68%, transparent); }
+  .lx-name { order: 1; position: relative; z-index: 2; pointer-events: none; font-size: clamp(60px, 19vw, 84px); margin: -.62em 0 2px; padding: 0; }
+  .lx-hero .eyebrow { order: 2; margin: 0 0 6px; font-size: 11px; }
+  .lx-hero h1 { order: 3; font-size: clamp(22px, 6vw, 28px); line-height: 1.15; }
+  .lx-hero .lead { order: 4; margin-top: 8px; font-size: 15px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .lx-cta { order: 5; flex-direction: column; gap: 8px; margin-top: 14px; }
+  .lx-cta .btn { flex: none; width: 100%; }
+  .lx-cta .btn-primary { min-height: 52px; }
+  .lx-cta .btn-secondary { min-height: 46px; }
+  .lx-proof { order: 6; margin-top: 18px; }
+  .lx-slogan { order: 7; margin: 14px 0 0; text-wrap: balance; }
+  .lx-proof li { font-size: 12px; }
+}
+@media (max-width: 359px) { .lx-cta .btn { font-size: 14px; padding-left: 10px; padding-right: 10px; } .lx-cta .btn .ic { display: none; } .lx-proof li { font-size: 11px; } }
+@media (max-width: 899px) and (max-height: 640px) { .lx-hero .lead { display: none; } .lx-photo picture { height: clamp(170px, 34svh, 300px); } }
+
+/* нижняя кнопка: одна, компактная, не закрывает контент */
+@media (max-width: 899px) {
+  .sticky { left: 16px; right: 16px; bottom: calc(12px + env(safe-area-inset-bottom)); padding: 0; background: transparent; border: 0; display: block; transform: translateY(24px); opacity: 0; visibility: hidden; transition: transform .2s, opacity .2s, visibility .2s; }
+  .sticky.on { transform: none; opacity: 1; visibility: visible; }
+  .sticky .btn { width: 100%; min-height: 52px; box-shadow: 0 8px 24px rgba(28, 26, 25, .28); }
+  html[data-menu="1"] .sticky, html[data-chat="1"] .sticky { visibility: hidden; }
+  html { scroll-padding-bottom: 96px; }
+  .site-footer { padding-bottom: 28px; }
+}
+@media (prefers-reduced-motion: reduce) { .sticky { transition: none; } }
+
+/* плотность главной на телефоне */
+@media (max-width: 899px) {
+  .lx-sec { padding: 40px 0; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .tile { min-height: 0; padding: 0; gap: 0; border-radius: 18px; }
+  .tile img, .tile .t-art { position: static; order: -1; width: 100%; height: 92px; -webkit-mask-image: none; mask-image: none; }
+  .tile .t-art svg { width: 44px; }
+  .tile .t-body { padding: 12px 12px 14px; gap: 4px; }
+  .tile h3 { font-size: 17px; max-width: none; }
+  .tile p { font-size: 13px; max-width: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .tile .go { display: none; }
+  .lx-about { padding: 36px 0; }
+  .about-grid { gap: 16px; align-items: start; }
+  .about-photo { width: 88px; margin: 0; border-width: 4px; }
+  .facts { gap: 12px; }
+  .art-list.three .art-card:nth-child(n+3) { display: none; }
+  .art-card p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .lx-steps { grid-template-columns: 1fr; gap: 0; margin-top: 16px; border: 1px solid var(--stone); border-radius: 18px; overflow: hidden; background: var(--paper); }
+  .lx-steps li { border: 0; border-bottom: 1px solid var(--stone); border-radius: 0; padding: 12px 16px; grid-template-columns: 28px 1fr; align-items: center; gap: 12px; }
+  .lx-steps li:last-child { border-bottom: 0; }
+  .lx-steps li::before { font-size: 24px; }
+  .lx-final { padding: 32px 20px; border-radius: 24px; }
+  .foot-grid { gap: 20px; }
+  .site-footer nav, .foot-grid > div:last-child { grid-template-columns: 1fr 1fr; column-gap: 12px; }
+  .site-footer nav b, .foot-grid > div:last-child b { grid-column: 1 / -1; }
+  .site-footer a:not(.wordmark) { min-height: 44px; }
+}
+.foot-ask { margin-top: 16px; width: 100%; max-width: 360px; }
+@media (max-width: 899px) { .lx-sec h2, .lx-about h2 { hyphens: manual; } .foot-grid > div:last-child p { grid-column: 1 / -1; } }

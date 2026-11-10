@@ -3,7 +3,15 @@ const { chromium } = require("playwright");
 const BASE = process.env.BASE_URL || "http://localhost:3000";
 let fails = 0; const check = (c, m) => { console.log(c ? "ok  " : "FAIL", m); if (!c) fails++; };
 const settle = (p) => p.waitForFunction(() => !document.querySelector(".bubble.typing") && !document.querySelector(".chat-log [aria-hidden=true]") && !!document.querySelector(".chat-input button[type=submit]") && !document.querySelector(".chat-input button[type=submit]").disabled, null, { timeout: 60000 });
-const askSel = (vp, path) => (vp.width < 900 && !/\/(book|manage)/.test(path)) ? ".sticky .btn-secondary" : ".chat-fab";
+// единственная видимая в экране кнопка входа в чат (первый экран главной, нижняя кнопка или плавающая)
+const CHROME = ".lx-hero [data-ask], .sticky [data-ask], .site-footer [data-ask], .chat-fab";
+const tagAsk = (p) => p.evaluate((sel) => {
+  document.querySelectorAll("[data-ask-target]").forEach((e) => e.removeAttribute("data-ask-target"));
+  const els = [...document.querySelectorAll(sel)].filter((e) => { const r = e.getBoundingClientRect(), cs = getComputedStyle(e); return r.width > 0 && cs.visibility !== "hidden" && r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth; });
+  if (els.length) els[0].setAttribute("data-ask-target", "");
+  return els.length;
+}, CHROME);
+const clickAsk = async (p) => { await p.waitForTimeout(350); const n = await tagAsk(p); if (n < 1) throw new Error("нет кнопки чата в экране"); await p.locator("[data-ask-target]").click(); };
 (async () => {
   const b = await chromium.launch();
   for (const [name, vp] of [["desktop", { width: 1440, height: 900 }], ["mobile", { width: 375, height: 800 }]]) {
@@ -11,13 +19,12 @@ const askSel = (vp, path) => (vp.width < 900 && !/\/(book|manage)/.test(path)) ?
     // кнопка есть на всех типах страниц
     for (const path of ["/ru", "/ru/services", "/ru/services/trichology", "/ru/library", "/ru/library/why-hair-falls-out", "/ru/about", "/ru/results", "/ru/contact", "/ru/book", "/uk", "/en/library"]) {
       await p.goto(BASE + path, { waitUntil: "domcontentloaded" });
-      await p.waitForSelector(askSel(vp, path), { timeout: 15000 }).catch(() => {});
-      const box = await p.locator(askSel(vp, path)).boundingBox().catch(() => null);
-      check(await p.locator(".sticky .btn-secondary:visible, .chat-fab:visible").count() === 1, `${name} ${path}: ровно одна кнопка «Задать вопрос»`);
-      check(!!box && box.x >= 0 && box.x + box.width <= vp.width && box.y + box.height <= vp.height, `${name} ${path}: кнопка консультанта видна и в границах экрана`);
+      await p.waitForTimeout(500);
+      const n = await tagAsk(p);
+      check(n === 1, `${name} ${path}: ровно одна кнопка входа в чат в экране (${n})`);
     }
     await p.goto(BASE + "/ru/services/trichology", { waitUntil: "networkidle" });
-    await p.locator(askSel(vp, "/ru/services/trichology")).click();
+    await clickAsk(p);
     await p.waitForSelector(".bubble.bot"); await settle(p);
     await p.fill(".chat-input input", "Безопасно ли наращивание волос?"); await p.keyboard.press("Enter");
     await settle(p);
@@ -36,10 +43,10 @@ const askSel = (vp, path) => (vp.width < 900 && !/\/(book|manage)/.test(path)) ?
     // закрыли чат и перешли — остаётся закрытым, но кнопка есть и история на месте
     await p.keyboard.press("Escape");
     await p.goto(BASE + "/ru/about", { waitUntil: "networkidle" });
-    check(await p.locator(".chat-panel").count() === 0 && await p.locator(askSel(vp, "/ru/about")).isVisible(), `${name}: закрытый чат не открывается сам`);
+    check(await p.locator(".chat-panel").count() === 0 && (await tagAsk(p)) === 1, `${name}: закрытый чат не открывается сам`);
     // другой язык: диалог начинается заново
     await p.goto(BASE + "/en", { waitUntil: "networkidle" });
-    await p.locator(askSel(vp, "/en")).click(); await p.waitForSelector(".bubble.bot"); await settle(p);
+    await clickAsk(p); await p.waitForSelector(".bubble.bot"); await settle(p);
     check(await p.locator(".chat-log .bubble.me").count() === 0, `${name}: при смене языка диалог новый`);
     await ctx.close();
   }

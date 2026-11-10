@@ -20,7 +20,7 @@ import { HTML_LANG, LOCALES, dictFor, isLoc, t } from "@/lib/i18n";
 import { SC } from "@/lib/site-copy";
 import Chat from "@/components/Chat";
 import SiteNav from "@/components/SiteNav";
-import { SourceCapture, StickyBar } from "@/components/Chrome";
+import { AskButton, SourceCapture, StickyBar } from "@/components/Chrome";
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#f7f4ef" };
 export function generateStaticParams() { return LOCALES.map((locale) => ({ locale })); }
@@ -52,6 +52,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
             <div>
               <a className="wordmark" href={`/${locale}`} aria-label="MK Extension Studio by Mila"><span className="wm-mk" aria-hidden="true">MK</span><span className="wm-txt" aria-hidden="true"><b>{c.brandTop}</b><i>{c.brandSub}</i></span></a>
               <p className="foot-tag">{c.footer.tag}</p>
+              <AskButton label={d.ctaAskBook} className="btn btn-primary m-only foot-ask" />
             </div>
             <nav aria-label={c.footer.explore}>
               <b>{c.footer.explore}</b>

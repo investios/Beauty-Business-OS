@@ -13,6 +13,8 @@ const dict = {
   heroTitle: { en: "Individual work on the beauty of your hair", ru: "Индивидуальная работа с красотой ваших волос", uk: "Індивідуальна робота з красою вашого волосся" },
   heroText: { en: "Hair extensions and the specialist's own technique. Ask a question or choose a convenient time for a consultation.", ru: "Наращивание волос и авторская технология мастера. Задайте вопрос или выберите удобное время для консультации.", uk: "Нарощування волосся та авторська технологія майстра. Поставте запитання або оберіть зручний час для консультації." },
   ctaBook: { en: "Choose a time", ru: "Выбрать время", uk: "Обрати час" },
+  ctaAskBook: { en: "Ask AI and book", ru: "Спросить AI и записаться", uk: "Запитати AI і записатися" },
+  ctaCalendar: { en: "Pick a time in the calendar", ru: "Выбрать время в календаре", uk: "Обрати час у календарі" },
   ctaAsk: { en: "Ask a question", ru: "Задать вопрос", uk: "Поставити запитання" },
   trust1: { en: "Booking without registration", ru: "Запись без регистрации", uk: "Запис без реєстрації" },
   trust2: { en: "Questions in EN · RU · UA", ru: "Вопросы на EN · RU · UA", uk: "Запитання EN · RU · UA" },

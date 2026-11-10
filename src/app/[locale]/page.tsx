@@ -33,8 +33,10 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
             <h1 id="h1"><span className="sr-only">{c.hero.name}. </span>{c.hero.title}</h1>
             <p className="lead">{c.hero.text}</p>
             <div className="lx-cta">
-              <a className="btn btn-primary" href={`/${locale}/book`}><IcCalendar className="ic" />{c.hero.cta1}</a>
-              <a className="btn btn-secondary" href={`/${locale}/about`}>{c.hero.cta2}</a>
+              <a className="btn btn-primary d-only" href={`/${locale}/book`}><IcCalendar className="ic" />{c.hero.cta1}</a>
+              <a className="btn btn-secondary d-only" href={`/${locale}/about`}>{c.hero.cta2}</a>
+              <AskButton label={d.ctaAskBook} className="btn btn-primary m-only" />
+              <a className="btn btn-secondary m-only" href={`/${locale}/book`}><IcCalendar className="ic" />{d.ctaCalendar}</a>
             </div>
             <ul className="lx-proof">{c.hero.proof.map((p, i) => { const I = proofIcons[i]; return <li key={p}><I />{p}</li>; })}</ul>
           </div>

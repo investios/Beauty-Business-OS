@@ -11,6 +11,7 @@ export default function SiteNav({ locale }: { locale: Loc }) {
   const rest = path.replace(/^\/(en|ru|uk)(?=\/|$)/, "");
   const [open, setOpen] = useState(false);
   useEffect(() => { setOpen(false); }, [path]);
+  useEffect(() => { document.documentElement.dataset.menu = open ? "1" : ""; return () => { document.documentElement.dataset.menu = ""; }; }, [open]);
   useEffect(() => {
     if (!open) return;
     const k = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
