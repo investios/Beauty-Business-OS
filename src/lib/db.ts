@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync } from "node:fs";
 
 // Единый интерфейс базы: Cloudflare D1 в продакшне, локальный SQLite (node:sqlite) в тестах и разработке.
 // Многошаговых транзакций в D1 нет, поэтому атомарность даёт batch(): все запросы пачки выполняются как один блок.
@@ -63,6 +63,8 @@ export async function createSqlite(file = ":memory:"): Promise<Db> {
   d.exec("PRAGMA foreign_keys = ON");
   const exists = (d.prepare("SELECT name FROM sqlite_master WHERE name='tenants'") as { all(): unknown[] }).all().length > 0;
   if (!exists) d.exec(readFileSync("migrations/0001_init.sql", "utf8"));
+  // последующие миграции безопасны для повторного запуска (CREATE ... IF NOT EXISTS)
+  for (const f of readdirSync("migrations").filter((x) => /^\d+_.*\.sql$/.test(x) && !x.startsWith("0001_")).sort()) d.exec(readFileSync(`migrations/${f}`, "utf8"));
   return new SqliteDb(d);
 }
 

@@ -7,8 +7,8 @@ describe("календарь на полгода вперёд", () => {
     const c = await setup();
     const all = await getAvailability(c.db, { tenantId: c.tenantId, serviceId: c.consult.id, now: NOW, days: 183 });
     const first = (day: string) => all.find((s) => s.startUtc.startsWith(day))?.startUtc;
-    expect(first("2027-03-23")).toBe("2027-03-23T10:00:00.000Z"); // зима: 10:00 местного = 10:00 UTC
-    expect(first("2027-03-30")).toBe("2027-03-30T09:00:00.000Z"); // лето: 10:00 местного = 09:00 UTC
+    expect(first("2027-03-23")).toBe("2027-03-23T08:00:00.000Z"); // зима: 08:00 местного = 08:00 UTC
+    expect(first("2027-03-30")).toBe("2027-03-30T07:00:00.000Z"); // лето: 08:00 местного = 07:00 UTC
     const last = all[all.length - 1].startUtc.slice(0, 10);
     expect(last >= "2027-05-01").toBe(true); // слоты доходят минимум до мая 2027
     // у сетки нет дублей и пропусков порядка

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { ownerTenant } from "@/lib/auth";
 import LogoutButton from "./LogoutButton";
 
-const NAV = [["today", "Сегодня"], ["clients", "Клиенты"], ["ai", "ИИ и вопросы"], ["marketing", "Маркетинг"], ["library", "Библиотека"]] as const;
+const NAV = [["today", "Сегодня"], ["schedule", "Расписание"], ["clients", "Клиенты"], ["ai", "ИИ и вопросы"], ["marketing", "Маркетинг"], ["library", "Библиотека"]] as const;
 
 export default async function OwnerShell({ current, children }: { current: string; children: (t: { id: string; name: string; is_demo: boolean }) => Promise<React.ReactNode> | React.ReactNode }) {
   const tenant = await ownerTenant();

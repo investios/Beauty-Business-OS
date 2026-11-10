@@ -102,8 +102,8 @@ export async function createTenant(db: Db, opts: { slug: string; name: string; i
     st.push({ sql: "INSERT INTO services(id,tenant_id,slug,title_i18n,desc_i18n,duration_min,buffer_min) VALUES (?1,?2,?3,?4,?5,?6,?7)", params: [sid, tenantId, s.slug, js(s.title), js(s.desc), s.duration, s.buffer] });
     st.push({ sql: "INSERT INTO staff_services(staff_id,service_id) VALUES (?1,?2)", params: [staffId, sid] });
   }
-  // Заглушка рабочих часов: вт–сб 10:00–18:00 местного времени (нужно подтвердить у мастера)
-  for (const wd of [2, 3, 4, 5, 6]) st.push({ sql: "INSERT INTO availability_rules(id,tenant_id,staff_id,weekday,start_min,end_min) VALUES (?1,?2,?3,?4,600,1080)", params: [uuid(), tenantId, staffId, wd] });
+  // Стандартные рабочие часы демо: пн–пт 08:00–17:00 местного времени. Мастер меняет их сам в кабинете («Расписание»)
+  for (const wd of [1, 2, 3, 4, 5]) st.push({ sql: "INSERT INTO availability_rules(id,tenant_id,staff_id,weekday,start_min,end_min) VALUES (?1,?2,?3,?4,480,1020)", params: [uuid(), tenantId, staffId, wd] });
   for (const key of ["rebook", "referral", "waitlist", "reactivation"]) st.push({ sql: "INSERT INTO automations(tenant_id,key) VALUES (?1,?2)", params: [tenantId, key] });
   const snapshot: unknown[] = [];
   for (const a of ARTICLES) for (const loc of ["en", "ru", "uk"] as const) {

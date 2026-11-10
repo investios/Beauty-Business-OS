@@ -12,15 +12,15 @@ const book = (cx: Ctx, startsAtUtc: string, i = 1, k = key()) =>
   createBooking(cx.db, { tenantId: cx.tenantId, serviceId: cx.consult.id, startsAtUtc, client: person(i), idempotencyKey: k, consentService: true, now: NOW });
 
 describe("availability", () => {
-  it("offers only working-hour slots in the future (Tue–Sat 10–18 Dublin), never within notice period", async () => {
+  it("offers only working-hour slots in the future (Mon–Fri 08–17 Dublin by default)", async () => {
     const s = await slots(c);
     expect(s.length).toBeGreaterThan(10);
-    expect(s[0].startUtc >= new Date(NOW.getTime() + 2 * 3600000).toISOString()).toBe(true);
+    expect(s[0].startUtc >= NOW.toISOString()).toBe(true);
     for (const x of s) {
       const d = new Date(x.startUtc);
-      expect([2, 3, 4, 5, 6]).toContain(d.getUTCDay()); // ноябрь: GMT=UTC
-      expect(d.getUTCHours()).toBeGreaterThanOrEqual(10);
-      expect(d.getUTCHours()).toBeLessThan(18);
+      expect([1, 2, 3, 4, 5]).toContain(d.getUTCDay()); // ноябрь: GMT=UTC
+      expect(d.getUTCHours()).toBeGreaterThanOrEqual(8);
+      expect(d.getUTCHours()).toBeLessThan(17);
     }
   });
   it("shifts by an hour in summer (BST): 10:00 local = 09:00Z", async () => {
@@ -91,7 +91,7 @@ describe("booking atomicity", () => {
 
 describe("holds", () => {
   it("held slot is unavailable; expired hold releases it", async () => {
-    const s = (await slots(c))[0];
+    const s = (await slots(c)).find((x) => x.startUtc > new Date(NOW.getTime() + 36 * 3600000).toISOString())!;
     await createHold(c.db, { tenantId: c.tenantId, serviceId: c.consult.id, startsAtUtc: s.startUtc, now: NOW });
     await expect(book(c, s.startUtc)).rejects.toBeInstanceOf(BookingError);
     const later = new Date(NOW.getTime() + 11 * 60000);
@@ -116,7 +116,7 @@ describe("cancel / reschedule / guest access", () => {
     expect(q.every((x: any) => x.status === "cancelled")).toBe(true);
   });
   it("reschedule moves booking and leaves exactly one queued reminder", async () => {
-    const all = await slots(c);
+    const all = (await slots(c)).filter((x) => x.startUtc > new Date(NOW.getTime() + 36 * 3600000).toISOString());
     const r = await book(c, all[0].startUtc);
     const target = all.find((x) => x.startUtc.slice(0, 10) !== all[0].startUtc.slice(0, 10))!;
     await rescheduleBooking(c.db, { tenantId: c.tenantId, id: r.appointmentId, token: r.manageToken, newStartUtc: target.startUtc, now: NOW });

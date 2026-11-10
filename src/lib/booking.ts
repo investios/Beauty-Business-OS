@@ -11,8 +11,21 @@ export class BookingError extends Error {
 export type Slot = { startUtc: string; endUtc: string; label: string };
 export type Service = { id: string; slug: string; title_i18n: Record<string, string>; desc_i18n: Record<string, string>; duration_min: number; buffer_min: number; price_mode: string; price_from_cents: number | null; is_placeholder: boolean };
 
-const STEP_MIN = 30;
-const MIN_NOTICE_MIN = 120; // заглушка: не раньше чем через 2 часа (подтвердить у мастера)
+/** Настройки слотов задаёт мастер в кабинете; если таблицы настроек ещё нет в базе, работают эти значения */
+export type ScheduleSettings = { stepMin: number; minNoticeMin: number; horizonDays: number };
+export const DEFAULT_SETTINGS: ScheduleSettings = { stepMin: 60, minNoticeMin: 0, horizonDays: 183 };
+export type ScheduleException = { id: string; day: string; kind: "closed" | "open"; start_min: number | null; end_min: number | null; note: string | null };
+export async function getScheduleSettings(db: Db, tenantId: string): Promise<ScheduleSettings> {
+  try {
+    const r = await one<{ step_min: number; min_notice_min: number; horizon_days: number }>(db, "SELECT step_min,min_notice_min,horizon_days FROM schedule_settings WHERE tenant_id=?1", [tenantId]);
+    return r ? { stepMin: r.step_min, minNoticeMin: r.min_notice_min, horizonDays: r.horizon_days } : DEFAULT_SETTINGS;
+  } catch { return DEFAULT_SETTINGS; }
+}
+export async function listExceptions(db: Db, tenantId: string, fromDay?: string): Promise<ScheduleException[]> {
+  try { return await rows<ScheduleException>(db, "SELECT id,day,kind,start_min,end_min,note FROM schedule_exceptions WHERE tenant_id=?1 AND day >= ?2 ORDER BY day,start_min", [tenantId, fromDay ?? "0000-00-00"]); }
+  catch { return []; }
+}
+const dayKey = (d: { y: number; mo: number; d: number }) => `${d.y}-${String(d.mo).padStart(2, "0")}-${String(d.d).padStart(2, "0")}`;
 const HOLD_MIN = 10;
 
 const token = () => { const b = new Uint8Array(24); crypto.getRandomValues(b); return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
@@ -45,8 +58,11 @@ export async function getAvailability(db: Db, p: { tenantId: string; serviceId: 
   if (p.staffId) staff = staff.filter((s) => s.id === p.staffId);
   const start = p.from ?? now;
   const lp = localParts(start.getTime(), tz);
+  const cfg = await getScheduleSettings(db, p.tenantId);
   const days = p.days ?? 14;
-  const earliest = now.getTime() + MIN_NOTICE_MIN * 60000;
+  const earliest = now.getTime() + cfg.minNoticeMin * 60000;
+  const latest = now.getTime() + cfg.horizonDays * 86400000;
+  const exc = await listExceptions(db, p.tenantId, dayKey(lp));
   const out: (Slot & { staffId: string })[] = [];
 
   for (const st of staff) {
@@ -58,12 +74,24 @@ export async function getAvailability(db: Db, p: { tenantId: string; serviceId: 
     for (let i = 0; i <= days; i++) {
       const day = addLocalDays(lp.y, lp.mo, lp.d, i);
       const wd = weekdayOfLocalDate(day.y, day.mo, day.d);
-      for (const r of rules.filter((x) => x.weekday === wd)) {
-        for (let m = r.start_min; m + svc.duration_min <= r.end_min; m += STEP_MIN) {
+      const k = dayKey(day);
+      const dayExc = exc.filter((e) => e.day === k);
+      const closedAll = dayExc.some((e) => e.kind === "closed" && e.start_min == null);
+      if (closedAll) continue; // выходной: ни одного слота
+      const intervals = [
+        ...rules.filter((x) => x.weekday === wd).map((x) => ({ a: x.start_min, b: x.end_min })),
+        ...dayExc.filter((e) => e.kind === "open").map((e) => ({ a: e.start_min!, b: e.end_min! })),
+      ];
+      const closedRanges = dayExc.filter((e) => e.kind === "closed").map((e) => ({ a: e.start_min!, b: e.end_min! }));
+      const seen = new Set<number>();
+      for (const r of intervals) {
+        for (let m = r.a; m + svc.duration_min <= r.b; m += cfg.stepMin) {
+          if (seen.has(m)) continue; seen.add(m);
+          if (closedRanges.some((c) => m < c.b && m + svc.duration_min > c.a)) continue;
           const z = zonedToUtc(day.y, day.mo, day.d, Math.floor(m / 60), m % 60, tz);
           if (z.status !== "ok") continue; // пропущенный/повторный час: явно не предлагаем
           const s = z.utcMs, e = s + svc.duration_min * 60000, blocked = e + svc.buffer_min * 60000;
-          if (s < earliest) continue;
+          if (s < earliest || s > latest) continue;
           if (busyMs.some(([bs, be]) => s < be && blocked > bs)) continue;
           out.push({ staffId: st.id, startUtc: new Date(s).toISOString(), endUtc: new Date(e).toISOString(), label: formatLocal(s, "en", tz) });
         }
@@ -87,6 +115,8 @@ export type BookingInput = {
   tenantId: string; serviceId: string; startsAtUtc: string; staffId?: string; holdId?: string;
   client: { name: string; contact: string; locale: string };
   idempotencyKey: string; consentService: boolean; consentMarketing?: boolean; source?: Record<string, string>;
+  /** запись, которую мастер ставит сам: любое время и день, без проверки по рабочим часам (занятость по-прежнему защищена) */
+  ownerOverride?: boolean;
   now?: Date;
 };
 export type BookingResult = { appointmentId: string; status: string; startsAtUtc: string; endsAtUtc: string; timezone: string; manageToken: string; confirmationDeliveryStatus: string; replayed: boolean };
@@ -133,6 +163,9 @@ export async function createBooking(db: Db, input: BookingInput): Promise<Bookin
     hold = await one<{ id: string; staff_id: string }>(db, "SELECT id,staff_id FROM appointments WHERE id=?1 AND tenant_id=?2 AND status='held' AND start_at=?3 AND hold_expires_at >= ?4", [input.holdId, input.tenantId, start.toISOString(), now.toISOString()]);
     if (!hold) throw new BookingError("slot_unavailable", "hold expired or not found");
     staffId = hold.staff_id;
+  } else if (input.ownerOverride) {
+    staffId = (await staffFor(db, input.tenantId, input.serviceId))[0]?.id;
+    if (!staffId) throw new BookingError("not_found", "no staff for service");
   } else if (!match) {
     throw new BookingError("slot_unavailable", "This time is not available", avail.slice(0, 5));
   }
