@@ -13,7 +13,7 @@ export default function Today() {
         const now = Date.now();
         const dublinDay = (ms: number) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Dublin" }).format(new Date(ms));
         const todayKey = dublinDay(now);
-        const horizon = new Date(now + 8 * 86400000).toISOString();
+        const horizon = new Date(now + 7 * 86400000).toISOString();
         const appts = await rows<Row>(db, `SELECT a.id,a.start_at,a.status,c.name,c.contact,c.id client_id,s.title_i18n,a.source,a.confirmation_delivery_status delivery,a.created_at
           FROM appointments a JOIN clients c ON c.id=a.client_id JOIN services s ON s.id=a.service_id
           WHERE a.tenant_id=?1 AND a.status IN ('confirmed','requested') AND a.start_at >= ?2 AND a.start_at < ?3 ORDER BY a.start_at LIMIT 100`, [t.id, new Date(now - 3 * 3600000).toISOString(), horizon]);
@@ -22,6 +22,7 @@ export default function Today() {
         const fresh = await count("SELECT count(*) n FROM appointments WHERE tenant_id=?1 AND status IN ('confirmed','requested') AND created_at >= ?2", [new Date(now - 7 * 86400000).toISOString()]);
         const handoffs = await count("SELECT count(*) n FROM handoffs WHERE tenant_id=?1 AND status='open'");
         const clients = await count("SELECT count(*) n FROM clients WHERE tenant_id=?1");
+        const week = await count("SELECT count(*) n FROM appointments WHERE tenant_id=?1 AND status IN ('confirmed','requested') AND start_at >= ?2 AND start_at < ?3", [new Date(now).toISOString(), horizon]);
         const today = appts.filter((a) => dublinDay(new Date(a.start_at).getTime()) === todayKey);
         const dayKey = (iso: string) => new Intl.DateTimeFormat("ru-RU", { timeZone: "Europe/Dublin", weekday: "long", day: "numeric", month: "long" }).format(new Date(iso));
         const groups = new Map<string, Row[]>();
@@ -30,15 +31,15 @@ export default function Today() {
           <h1>Обзор</h1>
           <div className="stats">
             <div className="stat"><b>{today.length}</b><span>записей сегодня</span></div>
-            <div className="stat"><b>{appts.length}</b><span>записей на 7 дней</span></div>
+            <div className="stat"><b>{week}</b><span>записей на 7 дней</span></div>
             <div className="stat"><b>{fresh}</b><span>новых записей за 7 дней</span></div>
             <div className="stat"><b>{pending}</b><span>ждут подтверждения</span></div>
             <div className="stat"><b>{clients}</b><span>клиентов в базе</span></div>
             <div className="stat"><b>{handoffs}</b><span>вопросов ждут вас</span></div>
           </div>
           {pending > 0 && <p><a className="link-ul" href="/owner/appointments?f=requested">Открыть записи, которые ждут подтверждения ({pending})</a></p>}
-          {appts.length === 0 && <p className="hint">На ближайшие 7 дней записей нет. Когда клиент запишется на сайте, она появится здесь. <a className="link-ul" href="/owner/schedule">Проверить расписание</a></p>}
-          {appts.length > 30 && <p className="hint">Показаны первые 30 из {appts.length}. <a className="link-ul" href="/owner/appointments">Все записи</a></p>}
+          {week === 0 && <p className="hint">На ближайшие 7 дней записей нет. Когда клиент запишется на сайте, она появится здесь. <a className="link-ul" href="/owner/schedule">Проверить расписание</a></p>}
+          {week > 30 && <p className="hint">Показаны первые 30 из {week}. <a className="link-ul" href="/owner/appointments">Все записи</a></p>}
           {[...groups.entries()].map(([day, list]) => (
             <section key={day}>
               <h2 className="cap">{day}</h2>
