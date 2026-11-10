@@ -10,10 +10,10 @@ const L = {
 const fails = [], ok = [];
 const check = (c, m) => (c ? ok : fails).push(m);
 async function openChat(page, t) {
-  const btns = page.getByRole("button", { name: t.ask });
-  const n = await btns.count();
-  for (let i = 0; i < n; i++) { const b = btns.nth(i); if (await b.isVisible()) { await b.click(); return true; } }
-  return false;
+  // единственная видимая точка входа: кнопка первого экрана / нижняя кнопка на телефоне или плавающая кнопка на компьютере
+  const b = page.locator("[data-ask]:visible, .chat-fab:visible").first();
+  if (!(await b.count())) return false;
+  await b.click(); return true;
 }
 async function say(page, text) {
   const before = await page.locator(".bubble.bot").count();

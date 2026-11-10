@@ -27,8 +27,12 @@ export function StickyBar({ locale, d }: { locale: string; d: Dict }) {
       const o = new IntersectionObserver(([e]) => setPast(!e.isIntersecting && e.boundingClientRect.top < 0), { threshold: 0 });
       o.observe(hero); obs.push(o);
     } else setPast(true); // внутренние страницы: кнопка видна сразу, чтобы спросить можно было с любой страницы
-    const f = document.querySelector(".site-footer [data-ask]"); // прячемся, когда в экране появилась такая же кнопка подвала
-    if (f) { const o = new IntersectionObserver(([e]) => setFoot(e.isIntersecting), { threshold: 0 }); o.observe(f); obs.push(o); }
+    // прячемся, когда в экране появилась такая же кнопка финального блока или подвала
+    const near = new Set<Element>();
+    document.querySelectorAll(".site-footer [data-ask], .lx-final [data-ask]").forEach((f) => {
+      const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) near.add(f); else near.delete(f); setFoot(near.size > 0); }, { threshold: 0 });
+      o.observe(f); obs.push(o);
+    });
     const isField = (t: EventTarget | null) => t instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName);
     const on = (e: FocusEvent) => { if (isField(e.target)) setTyping(true); };
     const off = () => setTyping(false);

@@ -42,7 +42,7 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) process
 
   // 3. чат: цена без выдумки, запись на пятницу, медицинский вопрос
   await p.goto(BASE + "/ru?utm_source=tiktok", { waitUntil: "networkidle" });
-  await p.getByRole("button", { name: "Задать вопрос" }).first().click();
+  await p.locator("[data-ask]:visible, .chat-fab:visible").first().click();
   await p.waitForSelector(".bubble.bot");
   const settle = () => p.waitForFunction(() => !document.querySelector(".bubble.typing") && !document.querySelector(".chat-log [aria-hidden=true]") && !document.querySelector(".chat-input button[type=submit]").disabled, null, { timeout: 40000 });
   await settle();

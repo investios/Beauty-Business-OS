@@ -226,6 +226,12 @@ details p { color: #4a423c; }
   .lx-hero-copy, .lx-photo { display: contents; }
   .lx-photo picture { order: 0; display: block; position: relative; margin: 0 calc(50% - 50vw); height: clamp(190px, 38svh, 360px); }
   .lx-photo img { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; object-position: 50% 12%; -webkit-mask-image: linear-gradient(to bottom, #000 68%, transparent); mask-image: linear-gradient(to bottom, #000 68%, transparent); }
+  .m-hide { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; margin: 0 !important; padding: 0 !important; }
+  .lx-svc { order: 2; margin: 0 0 8px; font: 600 14px/1.35 var(--ui); letter-spacing: .02em; color: var(--accent); text-align: center; }
+  .lx-quote { order: 3; margin: 0; font: 400 17px/1.45 var(--display); color: #3a342f; text-align: center; text-wrap: balance; }
+  .lx-how { margin: 14px 0 0; font-size: 16px; line-height: 1.5; color: var(--ink); }
+  .lx-final .btn-primary.m-only { width: 100%; max-width: 360px; }
+  body:has(.lx-final) .foot-ask { display: none; }
   .lx-name { order: 1; position: relative; z-index: 2; pointer-events: none; font-size: clamp(60px, 19vw, 84px); margin: -.62em 0 2px; padding: 0; }
   .lx-hero .eyebrow { order: 2; margin: 0 0 6px; font-size: 11px; }
   .lx-hero h1 { order: 3; font-size: clamp(22px, 6vw, 28px); line-height: 1.15; }

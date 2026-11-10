@@ -123,6 +123,28 @@ details p { padding: 0 20px 18px; color: var(--muted); }
 .times { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; margin-top: 8px; }
 .time { min-height: 48px; border: 1.5px solid var(--plum); border-radius: 12px; background: transparent; color: var(--plum); font: 700 16px var(--ui); cursor: pointer; }
 .time[aria-pressed="true"] { background: var(--plum); color: #fff; }
+.book-cal { display: grid; gap: 22px; margin-top: 10px; }
+.cal-label { font-weight: 700; color: var(--plum); margin: 0 0 8px; }
+.cal-picked { font-weight: 500; color: var(--muted); text-transform: lowercase; }
+.cal-picked::first-letter { text-transform: uppercase; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.cal-title { font: 600 22px/1.1 var(--display); text-transform: lowercase; text-align: center; flex: 1; }
+.cal-title::first-letter { text-transform: uppercase; }
+.cal-nav { flex: none; width: 52px; height: 52px; border-radius: 50%; border: 1.5px solid var(--plum); background: var(--paper); color: var(--plum); font: 400 28px/1 var(--ui); cursor: pointer; }
+.cal-nav:disabled { opacity: .3; cursor: default; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cal-wd { text-align: center; font: 700 12px var(--ui); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); padding: 4px 0 6px; }
+.cal-cell { min-height: 52px; border-radius: 12px; border: 1.5px solid transparent; background: transparent; font: 500 17px var(--ui); color: #a79c92; display: grid; place-items: center; padding: 0; }
+.cal-cell.empty { visibility: hidden; }
+.cal-cell.today:not(.free) { border-color: var(--stone); }
+.cal-cell.free { cursor: pointer; background: var(--soft); border-color: var(--champagne); color: var(--plum); font-weight: 700; }
+.cal-cell.free:hover { border-color: var(--plum); }
+.cal-cell.free[aria-pressed="true"] { background: var(--plum); border-color: var(--plum); color: #fff; }
+.cal-legend { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; font-size: 14px; color: var(--muted); }
+.cal-legend i { width: 18px; height: 18px; border-radius: 6px; background: var(--soft); border: 1.5px solid var(--champagne); flex: none; }
+.linklike { background: none; border: 0; padding: 8px 0; font: 700 15px var(--ui); color: var(--plum); text-decoration: underline; cursor: pointer; min-height: 44px; }
+.times-box { scroll-margin-bottom: 16px; }
+@media (max-width: 480px) { .panel { padding: 16px; } .cal-grid { gap: 3px; } .cal-cell { min-height: 48px; font-size: 16px; } }
 .hint { color: var(--muted); font-size: 14px; margin-top: 10px; }
 .field { display: grid; gap: 6px; margin-bottom: 16px; }
 .field label { font-weight: 700; font-size: 15px; color: var(--plum); }
@@ -204,3 +226,9 @@ textarea.kb { width: 100%; min-height: 96px; border: 1.5px solid #cbbfb2; border
 .bubble.typing i:nth-child(3) { animation-delay: .3s; }
 @keyframes typing-dot { 0%, 80%, 100% { opacity: .3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
 @media (prefers-reduced-motion: reduce) { .bubble.typing i { animation: none; opacity: .6; } }
+
+/* на странице записи плавающая кнопка не должна закрывать дни календаря: на телефоне только значок */
+@media (max-width: 899px) {
+  body:has(.book-cal) .chat-fab { padding: 0; width: 52px; height: 52px; min-height: 52px; justify-content: center; }
+  body:has(.book-cal) .chat-fab span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}

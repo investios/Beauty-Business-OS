@@ -16,7 +16,7 @@ let fails = 0; const check = (c, m) => { if (!c) { fails++; console.log("FAIL", 
       const sticky = document.querySelector(".sticky");
       return {
         vh: innerHeight, sw: document.documentElement.scrollWidth, vw: innerWidth,
-        wm: box(".wordmark"), img: box(".lx-photo img"), name: box(".lx-name"), h1: box(".lx-hero h1"),
+        wm: box(".wordmark"), img: box(".lx-photo img"), name: box(".lx-name"), h1: box(".lx-quote"), svc: box(".lx-svc"),
         cta: cta && (({ top, bottom }) => ({ t: top, b: bottom }))(cta.getBoundingClientRect()),
         cal: cal && (({ top, bottom }) => ({ t: top, b: bottom }))(cal.getBoundingClientRect()),
         ctaText: cta?.textContent, stickyVisible: sticky && getComputedStyle(sticky).visibility !== "hidden",
@@ -28,7 +28,8 @@ let fails = 0; const check = (c, m) => { if (!c) { fails++; console.log("FAIL", 
     const faceBottom = m.img.t + m.img.h * 0.55;
     check(m.img.t >= 0 && faceBottom <= m.vh, `${tag}: лицо в первом экране (кадр ${Math.round(m.img.t)}–${Math.round(m.img.b)})`);
     check(m.name.b <= m.vh && m.name.t >= 0, `${tag}: имя видно`);
-    check(m.h1.b <= m.vh, `${tag}: оффер (H1) виден, низ ${Math.round(m.h1.b)}`);
+    check(m.h1.b <= m.vh, `${tag}: короткая цитата Милы видна, низ ${Math.round(m.h1.b)}`);
+    check(m.svc.b <= m.vh, `${tag}: строка услуг видна`);
     check(m.cta && m.cta.b <= m.vh, `${tag}: главная кнопка видна целиком, низ ${m.cta && Math.round(m.cta.b)}`);
     check(m.cal && m.cal.b <= m.vh + 1, `${tag}: запасная запись (календарь) видна, низ ${m.cal && Math.round(m.cal.b)}`);
     check(!m.stickyVisible, `${tag}: нижняя кнопка скрыта на первом экране`);

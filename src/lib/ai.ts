@@ -161,7 +161,7 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
   const llmEligible = intents.every((i) => ["unknown", "extensions", "technique", "preparation"].includes(i));
   if (llmEligible) {
     const hist = await rows<{ role: string; content: string }>(db, "SELECT role,content FROM messages WHERE conversation_id=?1 AND COALESCE(json_extract(meta,'$.kind'),'') <> 'disclosure' ORDER BY rowid DESC LIMIT 8", [conv.id]);
-    const msgs: ChatMsg[] = [{ role: "system", content: buildSystemPrompt(locale) }, ...hist.reverse().map((m) => ({ role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant", content: m.content }))];
+    const msgs: ChatMsg[] = [{ role: "system", content: buildSystemPrompt(locale, kbv.snapshot, kbv.version) }, ...hist.reverse().map((m) => ({ role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant", content: m.content }))];
     const out = await (p.llm ?? runLlm)(msgs);
     if (out && !out.includes(HANDOFF_TOKEN) && answerIsSafe(out)) llmText = out.slice(0, 1200);
     tools.push({ tool: "llm", ok: !!llmText, detail: llmText ? "answered " + lastModel : out ? "refused_or_unsafe" : "unavailable: " + lastLlmError });

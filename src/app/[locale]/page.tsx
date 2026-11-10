@@ -28,17 +28,19 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       <section className="lx-hero" aria-labelledby="h1">
         <div className="wrap">
           <div className="lx-hero-copy">
-            <p className="eyebrow">{c.hero.eyebrow}</p>
+            <p className="eyebrow m-hide">{c.hero.eyebrow}</p>
             <p className="lx-name" aria-hidden="true">{c.hero.name}</p>
-            <h1 id="h1"><span className="sr-only">{c.hero.name}. </span>{c.hero.title}</h1>
-            <p className="lead">{c.hero.text}</p>
+            <h1 id="h1" className="m-hide"><span className="sr-only">{c.hero.name}. </span>{c.hero.title}</h1>
+            <p className="lx-svc m-only">{c.hero.svc}</p>
+            <p className="lx-quote m-only">{c.hero.quote}</p>
+            <p className="lead m-hide">{c.hero.text}</p>
             <div className="lx-cta">
               <a className="btn btn-primary d-only" href={`/${locale}/book`}><IcCalendar className="ic" />{c.hero.cta1}</a>
               <a className="btn btn-secondary d-only" href={`/${locale}/about`}>{c.hero.cta2}</a>
               <AskButton label={d.ctaAskBook} className="btn btn-primary m-only" />
               <a className="btn btn-secondary m-only" href={`/${locale}/book`}><IcCalendar className="ic" />{d.ctaCalendar}</a>
             </div>
-            <ul className="lx-proof">{c.hero.proof.map((p, i) => { const I = proofIcons[i]; return <li key={p}><I />{p}</li>; })}</ul>
+            <ul className="lx-proof m-hide">{c.hero.proof.map((p, i) => { const I = proofIcons[i]; return <li key={p}><I />{p}</li>; })}</ul>
           </div>
           <figure className="lx-photo">
             <picture>
@@ -93,7 +95,8 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       <section className="lx-sec" aria-labelledby="how-h">
         <div className="wrap">
           <h2 id="how-h">{d.howTitle}</h2>
-          <ol className="lx-steps">{[d.how1, d.how2, d.how3, d.how4].map((s) => <li key={s}><p>{s}</p></li>)}</ol>
+          <p className="lx-how m-only">{d.howShort}</p>
+          <ol className="lx-steps d-only">{[d.how1, d.how2, d.how3, d.how4].map((s) => <li key={s}><p>{s}</p></li>)}</ol>
           <p className="note">{d.aiNote}</p>
         </div>
       </section>
@@ -116,8 +119,9 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
             <h2 id="fin-h">{d.finalTitle}</h2>
             <p>{d.finalText}</p>
             <div className="lx-cta" style={{ justifyContent: "center" }}>
-              <a className="btn btn-primary" href={`/${locale}/book`}>{d.ctaBook}</a>
-              <AskButton label={d.ctaAsk} className="btn btn-secondary" />
+              <a className="btn btn-primary d-only" href={`/${locale}/book`}>{d.ctaBook}</a>
+              <AskButton label={d.ctaAsk} className="btn btn-secondary d-only" />
+              <AskButton label={d.ctaAskBook} className="btn btn-primary m-only" />
             </div>
           </div>
         </div>

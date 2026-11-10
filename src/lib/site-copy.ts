@@ -16,7 +16,7 @@ interface Hub { title: string; tile: string; lead: string; points: string[]; not
 interface Copy {
   nav: { home: string; about: string; services: string; library: string; results: string; contact: string; book: string; menu: string; lang: string };
   brandTop: string; brandSub: string; demoNote: string;
-  hero: { eyebrow: string; name: string; title: string; text: string; cta1: string; cta2: string; slogan: string; proof: string[]; alt: string };
+  hero: { eyebrow: string; name: string; title: string; text: string; cta1: string; cta2: string; slogan: string; proof: string[]; alt: string; svc: string; quote: string };
   aboutBlock: { eyebrow: string; title: string; text: string; link: string; facts: string[]; alt: string };
   servicesTitle: string; servicesLead: string; more: string;
   hubs: Record<HubId, Hub>;
@@ -37,6 +37,7 @@ export const SC: Record<Loc, Copy> = {
       text: "Комплексный подход к красоте и здоровью ваших волос: от эстетики наращивания до понятного разбора того, что происходит с волосами и кожей головы.",
       cta1: "Записаться на консультацию", cta2: "О моём подходе", slogan: "Красивые волосы начинаются с их здоровья",
       proof: ["Экспертный подход", "Научная основа", "Индивидуальные решения"], alt: "Мила, мастер по наращиванию и здоровью волос",
+      svc: "Наращивание волос • Уход • Консультации", quote: "Красивые волосы начинаются с заботы об их здоровье. Помогу подобрать решение для ваших волос.",
     },
     aboutBlock: {
       eyebrow: "Обо мне", title: "Почему я занимаюсь здоровьем и красотой волос",
@@ -84,6 +85,7 @@ export const SC: Record<Loc, Copy> = {
       text: "A complete approach to the beauty and health of your hair: from the aesthetics of extensions to a clear look at what is happening with your hair and scalp.",
       cta1: "Book a consultation", cta2: "My approach", slogan: "Beautiful hair starts with healthy hair",
       proof: ["Expert approach", "Science-based", "Individual solutions"], alt: "Mila, hair extension and hair health specialist",
+      svc: "Hair extensions • Care • Consultations", quote: "Beautiful hair starts with caring for its health. I will help you find the right solution for your hair.",
     },
     aboutBlock: {
       eyebrow: "About me", title: "Why I work on hair health and beauty",
@@ -131,6 +133,7 @@ export const SC: Record<Loc, Copy> = {
       text: "Комплексний підхід до краси й здоров'я вашого волосся: від естетики нарощування до зрозумілого розбору того, що відбувається з волоссям і шкірою голови.",
       cta1: "Записатися на консультацію", cta2: "Про мій підхід", slogan: "Гарне волосся починається зі здоров'я",
       proof: ["Експертний підхід", "Наукова основа", "Індивідуальні рішення"], alt: "Міла, майстер із нарощування та здоров'я волосся",
+      svc: "Нарощування волосся • Догляд • Консультації", quote: "Гарне волосся починається з турботи про його здоров'я. Допоможу підібрати рішення для вашого волосся.",
     },
     aboutBlock: {
       eyebrow: "Про мене", title: "Чому я займаюся здоров'ям і красою волосся",
