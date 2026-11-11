@@ -65,9 +65,9 @@ export function classify(text: string): Intent[] {
 /* ---------- тексты интерфейса диалога (не факты о мастере) ---------- */
 const T = {
   disclosure: {
-    en: "Hi! I'm an AI assistant for this studio. I answer from information approved by the specialist, and I can show real free times. For anything I can't answer, I'll pass your question to the specialist. You can also book directly without chatting with me.",
-    ru: "Здравствуйте! Я ИИ-ассистент этой студии. Отвечаю по информации, утверждённой мастером, и могу показать реальное свободное время. Если не смогу ответить, передам вопрос мастеру. Записаться можно и напрямую, без общения со мной.",
-    uk: "Вітаю! Я ШІ-асистент цієї студії. Відповідаю за інформацією, затвердженою майстром, і можу показати реальний вільний час. Якщо не зможу відповісти, передам питання майстру. Записатися можна й напряму, без спілкування зі мною.",
+    en: "Hello! I'm the AI consultant of Mila's studio: your hair expert on extensions, hair health and recovery. I answer from knowledge approved by Mila and based on reliable medical sources, so ask me anything. I can suggest a solution, show real free times, and pass anything complex to Mila. I am not a doctor, so I cannot diagnose.",
+    ru: "Здравствуйте! Я ИИ-консультант студии Милы: ваш эксперт по наращиванию, здоровью и восстановлению волос. Отвечаю по знаниям, которые утвердила Мила и которые опираются на проверенные медицинские источники, поэтому спрашивайте о чём угодно. Подскажу решение, покажу реальное свободное время, а сложное передам Миле. Я не врач и диагнозов не ставлю.",
+    uk: "Вітаю! Я ШІ-консультант студії Міли: ваш експерт з нарощування, здоров'я та відновлення волосся. Відповідаю за знаннями, які затвердила Міла і які спираються на перевірені медичні джерела, тож питайте про що завгодно. Підкажу рішення, покажу реальний вільний час, а складне передам Мілі. Я не лікар і діагнозів не ставлю.",
   },
   slotsIntro: { en: "Here are the nearest free times:", ru: "Вот ближайшее свободное время:", uk: "Ось найближчий вільний час:" },
   slotsNoMatch: { en: "I have nothing free at exactly that time.", ru: "На это время свободного места нет.", uk: "На цей час вільного місця немає." },

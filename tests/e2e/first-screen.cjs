@@ -33,7 +33,7 @@ let fails = 0; const check = (c, m) => { if (!c) { fails++; console.log("FAIL", 
     check(m.cta && m.cta.b <= m.vh, `${tag}: главная кнопка видна целиком, низ ${m.cta && Math.round(m.cta.b)}`);
     check(m.cal && m.cal.b <= m.vh + 1, `${tag}: запасная запись (календарь) видна, низ ${m.cal && Math.round(m.cal.b)}`);
     check(!m.stickyVisible, `${tag}: нижняя кнопка скрыта на первом экране`);
-    check(/AI/.test(m.ctaText || ""), `${tag}: текст главной кнопки «${m.ctaText}»`);
+    check(/(консульт|consult)/i.test(m.ctaText || ""), `${tag}: текст главной кнопки «${m.ctaText}»`);
     if (lang === "ru") await p.screenshot({ path: `tests/e2e/shots-lux/pr1-${w}x${h}.png` });
     // прокрутка: после ухода кнопок hero появляется ОДНА нижняя кнопка; у подвала скрыта
     await p.evaluate(() => window.scrollTo(0, 1400)); await p.waitForTimeout(400);

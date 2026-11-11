@@ -6,7 +6,7 @@ const BASE = process.env.BASE_URL || "http://localhost:3100";
   for (const v of (process.env.THEMES || "a,b,c,b1,b2,b3,d1,d2,d3").split(",")) for (const w of [375, 1440]) {
     const p = await b.newPage({ viewport: { width: w, height: 800 } });
     await p.goto(`${BASE}/concepts/${v}?lang=ru`, { waitUntil: "networkidle" });
-    const btns = p.getByRole("button", { name: "Задать вопрос" });
+    const btns = p.getByRole("button", { name: "Проконсультироваться" });
     for (let i = 0; i < await btns.count(); i++) if (await btns.nth(i).isVisible()) { await btns.nth(i).click(); break; }
     await p.waitForSelector(".bubble.bot", { timeout: 40000 });
     await p.locator(".chat-input input").fill("Сколько стоит?"); await p.locator(".chat-input button[type=submit]").click();

@@ -53,7 +53,7 @@ export const SC: Record<Loc, Copy> = {
       care: { title: "Уход и поддержка", tile: "Домашний уход, подбор средств и рекомендации", lead: "Домашний уход, подбор средств и рекомендации после услуг.", points: ["Как мыть, сушить и расчёсывать волосы", "Какие средства подходят именно вам", "Срок коррекции Мила называет индивидуально"], note: "Рекомендации по средствам появятся здесь после утверждения мастером." },
       consultation: { title: "Консультация", tile: "Первый шаг", lead: "Первый шаг: поговорить с Милой о ваших волосах и целях.", points: ["Расскажите о волосах, пожеланиях и вопросах", "Мила подскажет, какое направление подходит", "Вы решаете, нужна ли следующая услуга"], note: "Стоимость и длительность подтверждаются мастером; сейчас они не показаны." },
     },
-    hubLabels: { what: "Как это проходит", related: "Читайте в библиотеке", ask: "Задать вопрос" },
+    hubLabels: { what: "Как это проходит", related: "Читайте в библиотеке", ask: "Проконсультироваться" },
     lib: {
       eyebrow: "Библиотека знаний", title: "Понятно о волосах и коже головы", text: "Статьи с источниками: что известно о выпадении, наращивании и уходе — и когда стоит обратиться к врачу.", all: "Все статьи", read: "Читать",
       draftBadge: "На утверждении у Милы", approvedBadge: "Утверждено Милой", sources: "Источники", faq: "Короткие ответы", related: "Читайте также", back: "К библиотеке",
@@ -101,7 +101,7 @@ export const SC: Record<Loc, Copy> = {
       care: { title: "Care and support", tile: "Home care, product choice and advice", lead: "Home care, product choice and advice after your service.", points: ["How to wash, dry and brush your hair", "Which products suit you", "Mila names the correction time individually"], note: "Product recommendations will appear here after the specialist approves them." },
       consultation: { title: "Consultation", tile: "The first step", lead: "The first step: talk with Mila about your hair and goals.", points: ["Tell us about your hair, wishes and questions", "Mila suggests which direction suits you", "You decide whether you need a further service"], note: "Price and duration are confirmed by the specialist and are not shown yet." },
     },
-    hubLabels: { what: "How it goes", related: "Read in the library", ask: "Ask a question" },
+    hubLabels: { what: "How it goes", related: "Read in the library", ask: "Get a consultation" },
     lib: {
       eyebrow: "Knowledge library", title: "Hair and scalp, explained clearly", text: "Articles with sources: what is known about shedding, extensions and care, and when to see a doctor.", all: "All articles", read: "Read",
       draftBadge: "Awaiting Mila's approval", approvedBadge: "Approved by Mila", sources: "Sources", faq: "Quick answers", related: "Related reading", back: "Back to the library",
@@ -149,7 +149,7 @@ export const SC: Record<Loc, Copy> = {
       care: { title: "Догляд і підтримка", tile: "Домашній догляд, добір засобів і рекомендації", lead: "Домашній догляд, добір засобів і рекомендації після послуг.", points: ["Як мити, сушити та розчісувати волосся", "Які засоби підходять саме вам", "Термін корекції Міла називає індивідуально"], note: "Рекомендації щодо засобів з'являться тут після затвердження майстром." },
       consultation: { title: "Консультація", tile: "Перший крок", lead: "Перший крок: поговорити з Мілою про ваше волосся та цілі.", points: ["Розкажіть про волосся, побажання та запитання", "Міла підкаже, який напрям підходить", "Ви вирішуєте, чи потрібна наступна послуга"], note: "Вартість і тривалість підтверджуються майстром; зараз їх не показано." },
     },
-    hubLabels: { what: "Як це відбувається", related: "Читайте в бібліотеці", ask: "Поставити запитання" },
+    hubLabels: { what: "Як це відбувається", related: "Читайте в бібліотеці", ask: "Проконсультуватися" },
     lib: {
       eyebrow: "Бібліотека знань", title: "Зрозуміло про волосся та шкіру голови", text: "Статті з джерелами: що відомо про випадіння, нарощування й догляд — і коли варто звернутися до лікаря.", all: "Усі статті", read: "Читати",
       draftBadge: "На затвердженні в Міли", approvedBadge: "Затверджено Мілою", sources: "Джерела", faq: "Короткі відповіді", related: "Читайте також", back: "До бібліотеки",

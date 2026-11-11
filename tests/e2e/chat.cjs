@@ -3,9 +3,9 @@
 const { chromium } = require("playwright");
 const BASE = process.env.BASE_URL || "http://localhost:3100";
 const L = {
-  ru: { ask: "Задать вопрос", q: "Сколько стоит наращивание?", med: "У меня сильно выпадают волосы, что делать?", book: "Хочу записаться на консультацию", human: "Передано мастеру", booked: "Записано" },
-  en: { ask: "Ask a question", q: "How much do extensions cost?", med: "My hair is falling out a lot, what should I do?", book: "I want to book a consultation", human: "Passed to the specialist", booked: "Booked" },
-  uk: { ask: "Поставити запитання", q: "Скільки коштує нарощування?", med: "У мене сильно випадає волосся, що робити?", book: "Хочу записатися на консультацію", human: "Передано майстру", booked: "Записано" },
+  ru: { ask: "Проконсультироваться", q: "Сколько стоит наращивание?", med: "У меня сильно выпадают волосы, что делать?", book: "Хочу записаться на консультацию", human: "Передано мастеру", booked: "Записано" },
+  en: { ask: "Get a consultation", q: "How much do extensions cost?", med: "My hair is falling out a lot, what should I do?", book: "I want to book a consultation", human: "Passed to the specialist", booked: "Booked" },
+  uk: { ask: "Проконсультуватися", q: "Скільки коштує нарощування?", med: "У мене сильно випадає волосся, що робити?", book: "Хочу записатися на консультацію", human: "Передано майстру", booked: "Записано" },
 };
 const fails = [], ok = [];
 const check = (c, m) => (c ? ok : fails).push(m);
