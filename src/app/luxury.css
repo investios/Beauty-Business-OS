@@ -290,3 +290,6 @@ details p { color: #4a423c; }
 }
 .foot-ask { margin-top: 16px; width: 100%; max-width: 360px; }
 @media (max-width: 899px) { .lx-sec h2, .lx-about h2 { hyphens: manual; } .foot-grid > div:last-child p { grid-column: 1 / -1; } }
+
+/* акцентный штрих иконок: на тёмном фоне светлее */
+.btn-primary .ac, .site-footer .ac, .lx-final .ac { stroke: var(--champagne); }
