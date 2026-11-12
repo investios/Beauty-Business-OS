@@ -317,3 +317,7 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 @media (max-width: 900px) { .oc-week { grid-template-columns: minmax(0, 1fr); } .oc-cell { min-height: 60px; padding: 4px; } .oc-cell small { display: none; } }
 
 #waitlist h3, #sick h3 { margin: 18px 0 8px; font-size: 18px; }
+.msg-pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #f7f2ec; border-radius: 10px; padding: 10px 12px; font: 400 14px/1.5 var(--ui); margin: 8px 0; }
+.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.sched-list li > details { width: 100%; }
+.sched-list li > details > summary { cursor: pointer; overflow-wrap: anywhere; }

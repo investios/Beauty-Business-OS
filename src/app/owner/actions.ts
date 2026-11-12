@@ -221,3 +221,30 @@ export async function setWaitlistStatus(fd: FormData) {
   await audit(db, tenantId, "owner", "waitlist.status", `${String(fd.get("id"))} ${st}`);
   revalidatePath("/owner/calendar"); backCal("wl_saved");
 }
+
+/** Пробный прогон сообщений на выбранную дату. Ничего не отправляет клиентам. */
+export async function runLifecycleSimulation(fd: FormData) {
+  const { tenantId, db } = await guard();
+  const m = String(fd.get("at") ?? "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+  if (!m) redirect("/owner/messages?m=bad_date");
+  const z = zonedToUtc(+m![1], +m![2], +m![3], +m![4], +m![5]);
+  if (z.status !== "ok") redirect("/owner/messages?m=bad_date");
+  const { runLifecycle } = await import("@/lib/lifecycle");
+  const r = await runLifecycle(db, tenantId, { nowMs: (z as { utcMs: number }).utcMs, assumeVisits: fd.get("assume") === "1" });
+  if (!r.ready) redirect("/owner/messages?m=migration");
+  revalidatePath("/owner/messages");
+  redirect(`/owner/messages?m=ran&p=${r.planned}&s=${r.simulated}&k=${r.skipped}&w=${r.waiting}`);
+}
+/** Вернуть пробные сообщения в очередь, чтобы проиграть сценарий заново */
+export async function resetLifecycleSimulation() {
+  const { tenantId, db } = await guard();
+  try {
+    await db.batch([
+      { sql: "UPDATE notifications SET status='queued', error=NULL WHERE tenant_id=?1 AND id IN (SELECT notification_id FROM lifecycle_messages WHERE tenant_id=?1 AND mode IN ('simulated','skipped'))", params: [tenantId] },
+      { sql: "DELETE FROM lifecycle_messages WHERE tenant_id=?1 AND mode IN ('simulated','skipped')", params: [tenantId] },
+    ]);
+  } catch { redirect("/owner/messages?m=migration"); }
+  await audit(db, tenantId, "owner", "lifecycle.reset");
+  revalidatePath("/owner/messages");
+  redirect("/owner/messages?m=reset");
+}
