@@ -1,7 +1,8 @@
 import OwnerShell from "@/components/OwnerShell";
 import { getDb, rows } from "@/lib/db";
 import { getScheduleSettings, listExceptions } from "@/lib/booking";
-import { addException, applyDefaultSchedule, deleteException, manualBooking, saveService, saveSettings, saveWeekly } from "../actions";
+import { getServiceRules } from "@/lib/service-rules";
+import { addException, saveServiceRules, applyDefaultSchedule, deleteException, manualBooking, saveService, saveSettings, saveWeekly } from "../actions";
 export const dynamic = "force-dynamic";
 
 const DAYS = [["1", "Понедельник"], ["2", "Вторник"], ["3", "Среда"], ["4", "Четверг"], ["5", "Пятница"], ["6", "Суббота"], ["0", "Воскресенье"]] as const;
@@ -9,7 +10,7 @@ const MSG: Record<string, [boolean, string]> = {
   saved: [true, "Сохранено"], defaults: [true, "Стандартное расписание применено: пн–пт 08:00–17:00, шаг 1 час"], booked: [true, "Клиент записан"],
   bad_time: [false, "Проверьте время: конец должен быть позже начала"], bad_value: [false, "Проверьте введённые значения"],
   bad_client: [false, "Укажите имя клиента, e-mail или телефон и отметьте согласие клиента"], taken: [false, "Это время уже занято другой записью"],
-  migration: [false, "Эта настройка ещё не включена в базе: нужно применить миграцию 0004 (инструкция внизу страницы)"], error: [false, "Не удалось сохранить, попробуйте ещё раз"],
+  migration: [false, "Эта настройка ещё не включена в базе: нужно применить миграцию 0004 или 0005 (инструкция внизу страницы)"], error: [false, "Не удалось сохранить, попробуйте ещё раз"],
 };
 const hhmm = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 const hhmmEnd = (m: number) => (m === 1440 ? "00:00" : hhmm(m));
@@ -24,6 +25,9 @@ export default async function Schedule({ searchParams }: { searchParams: Promise
         const settings = await getScheduleSettings(db, t.id);
         const exc = await listExceptions(db, t.id, new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Dublin" }).format(new Date()));
         const services = await rows<{ id: string; title_i18n: Record<string, string>; duration_min: number; buffer_min: number }>(db, "SELECT id,title_i18n,duration_min,buffer_min FROM services WHERE tenant_id=?1 AND active=1 ORDER BY duration_min", [t.id]);
+        const svcRules = await getServiceRules(db, t.id);
+        let rulesReady = true;
+        try { await rows(db, "SELECT 1 FROM service_rules LIMIT 1"); } catch { rulesReady = false; }
         let migrated = true;
         try { await rows(db, "SELECT 1 FROM schedule_settings LIMIT 1"); await rows(db, "SELECT 1 FROM schedule_exceptions LIMIT 1"); } catch { migrated = false; }
         const msg = m ? MSG[m] : undefined;
@@ -110,6 +114,36 @@ export default async function Schedule({ searchParams }: { searchParams: Promise
             </ul>
           </section>
 
+          <section className="panel" id="rules">
+            <h2>Правила для каждой услуги</h2>
+            <p className="hint" style={{ marginTop: 0 }}>Например: «Снятие» только по вторникам, не больше двух за день, за 15 минут до начала нужна подготовка. Правила действуют на сайте, в ИИ-ассистенте и в календаре одинаково. Ручная запись от вас их не проверяет. Перерыв в течение дня задаёт второй промежуток в рабочих часах выше.</p>
+            {!rulesReady && <p className="msg-error" role="status">Правила по услугам ещё не включены в базе: нужно применить миграцию 0005 (инструкция внизу страницы).</p>}
+            <ul className="sched-list">
+              {services.map((s) => {
+                const r = svcRules.get(s.id);
+                const on = (d: number) => (r ? r.weekdays.includes(d) : true);
+                return (
+                  <li key={s.id}>
+                    <form action={saveServiceRules} className="rules-form">
+                      <input type="hidden" name="id" value={s.id} />
+                      <b>{s.title_i18n.ru ?? s.title_i18n.en}</b>
+                      <fieldset className="rules-days"><legend>В какие дни недели оказывается</legend>
+                        {DAYS.map(([wd, name]) => <label key={wd} className="check"><input type="checkbox" name={`d${wd}`} value="1" defaultChecked={on(Number(wd))} /><span>{name.slice(0, 2)}</span></label>)}
+                      </fieldset>
+                      <div className="sched-set">
+                        <label className="field"><span>Начало не раньше</span><input type="time" name="earliest" defaultValue={r?.earliestMin != null ? hhmm(r.earliestMin) : ""} /></label>
+                        <label className="field"><span>Начало не позже</span><input type="time" name="latest" defaultValue={r?.latestMin != null ? hhmmEnd(r.latestMin) : ""} /></label>
+                        <label className="field"><span>Максимум в день (пусто = без лимита)</span><input type="number" name="max" min={1} max={50} defaultValue={r?.maxPerDay ?? ""} /></label>
+                        <label className="field"><span>Подготовка до записи, мин</span><input type="number" name="before" min={0} max={240} defaultValue={r?.bufferBeforeMin ?? 0} /></label>
+                      </div>
+                      <button className="btn btn-secondary btn-sm" type="submit">Сохранить правила</button>
+                    </form>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+
           <section className="panel">
             <h2>Записать клиента вручную на любое время</h2>
             <p className="hint" style={{ marginTop: 0 }}>Любой день и минуты, например воскресенье 17:15. Рабочие часы не проверяются, двойная запись на занятое время невозможна.</p>
@@ -125,6 +159,12 @@ export default async function Schedule({ searchParams }: { searchParams: Promise
             </form>
           </section>
 
+          {!rulesReady && (
+            <section className="panel warnbox">
+              <h2>Для правил услуг и листа ожидания нужна миграция 0005</h2>
+              <p>Откройте в Cloudflare базу <b>beauty-os</b>, вкладку «Console», сделайте резервную копию, вставьте содержимое файла <code>migrations/0005_calendar_rules.sql</code> и выполните. Безопасно: только добавляет две таблицы, ничего не меняет. До этого сайт и кабинет работают как раньше.</p>
+            </section>
+          )}
           {!migrated && (
             <section className="panel warnbox">
               <h2>Нужно один раз обновить базу</h2>

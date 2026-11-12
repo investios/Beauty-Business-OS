@@ -286,3 +286,34 @@ input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: n
 .owner-main > * { min-width: 0; }
 .owner-main .item, .owner-main .item * { overflow-wrap: anywhere; }
 .owner-search .btn { background: #fff; color: var(--ink); border-color: #fff; }
+
+/* PR2: календарь владельца и правила услуг */
+.oc-bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; }
+.oc-nav { display: flex; gap: 8px; flex: none; flex-wrap: wrap; }
+.oc-nav .btn { flex: none; }
+.oc-title { margin: 14px 0 4px; }
+.oc-month { display: grid; gap: 4px; overflow-x: auto; }
+.oc-head, .oc-weekrow { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.oc-head span { font: 600 13px var(--ui); color: var(--muted, #6b5e53); text-align: center; padding: 4px 0; }
+.oc-cell { display: flex; flex-direction: column; gap: 2px; min-height: 76px; padding: 6px; border: 1px solid var(--stone); border-radius: 10px; background: #fff; color: var(--ink); text-decoration: none; overflow: hidden; }
+.oc-cell.out { background: #faf7f3; }
+.oc-cell.out b { color: #6b5e53; font-weight: 600; }
+.oc-cell.today { border: 2px solid var(--ink); }
+.oc-cell:hover, .oc-cell:focus-visible { background: #f7f1ea; }
+.oc-cell b { font: 700 15px var(--ui); }
+.oc-n { font: 600 12px var(--ui); background: #efe6da; border-radius: 6px; padding: 1px 5px; align-self: flex-start; }
+.oc-cell small { font: 400 12px var(--ui); color: #5f564d; }
+.oc-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.oc-col { border: 1px solid var(--stone); border-radius: 12px; padding: 8px; background: #fff; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.oc-col.today { border: 2px solid var(--ink); }
+.oc-col h3 { margin: 0; font-size: 15px; }
+.oc-appt { display: flex; flex-direction: column; gap: 1px; padding: 6px 8px; border-radius: 8px; background: #f3ece3; color: var(--ink); text-decoration: none; font: 400 14px var(--ui); overflow-wrap: anywhere; }
+.oc-appt.warn { background: #fbefd9; }
+.oc-appt small { font: 400 12px var(--ui); color: #5f564d; }
+.oc-day { display: grid; gap: 8px; max-width: 560px; }
+.rules-form { display: grid; gap: 10px; width: 100%; }
+.rules-days { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.rules-days legend { font: 600 14px var(--ui); margin-bottom: 4px; }
+@media (max-width: 900px) { .oc-week { grid-template-columns: minmax(0, 1fr); } .oc-cell { min-height: 60px; padding: 4px; } .oc-cell small { display: none; } }
+
+#waitlist h3, #sick h3 { margin: 18px 0 8px; font-size: 18px; }

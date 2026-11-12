@@ -177,3 +177,47 @@ export async function rescheduleAppt(fd: FormData) {
   catch (e) { code = e instanceof BookingError && e.code === "slot_taken" ? "taken" : "error"; }
   revalidatePath("/owner/appointments"); apptBackOf(fd, id, code);
 }
+
+/** Правила услуги: дни недели, окно начала, лимит в день, подготовка до записи (миграция 0005) */
+export async function saveServiceRules(fd: FormData) {
+  const { tenantId, db } = await guard();
+  const id = String(fd.get("id"));
+  const days = [0, 1, 2, 3, 4, 5, 6].filter((d) => fd.get(`d${d}`) === "1");
+  const a = toMin(fd.get("earliest")), b0 = toMin(fd.get("latest"));
+  const b = b0 === 0 && a != null && a > 0 ? 1440 : b0;
+  const maxRaw = String(fd.get("max") ?? "").trim(), max = maxRaw === "" ? null : Math.round(Number(maxRaw));
+  const before = Math.round(Number(fd.get("before") || 0));
+  if (days.length === 0 || (a != null && b != null && b <= a) || (max != null && !(max >= 1 && max <= 50)) || !(before >= 0 && before <= 240)) back("bad_value");
+  try {
+    await db.run("INSERT INTO service_rules(service_id,tenant_id,weekdays,earliest_min,latest_min,max_per_day,buffer_before_min,updated_at) SELECT ?1,?2,?3,?4,?5,?6,?7,?8 WHERE EXISTS (SELECT 1 FROM services WHERE id=?1 AND tenant_id=?2) ON CONFLICT(service_id) DO UPDATE SET weekdays=?3,earliest_min=?4,latest_min=?5,max_per_day=?6,buffer_before_min=?7,updated_at=?8",
+      [id, tenantId, days.join(","), a, b, max, before, nowIso()]);
+  } catch { back("migration"); }
+  await audit(db, tenantId, "owner", "service.rules", id);
+  revalidatePath("/owner/schedule"); back("saved");
+}
+
+const backCal = (code: string) => redirect(`/owner/calendar?m=${code}#waitlist`);
+/** Лист ожидания: только запись в список, клиенту ничего не отправляется */
+export async function addWaitlist(fd: FormData) {
+  const { tenantId, db } = await guard();
+  const name = String(fd.get("name") ?? "").trim().slice(0, 100), contact = String(fd.get("contact") ?? "").trim().slice(0, 120);
+  const from = String(fd.get("from") ?? ""), to = String(fd.get("to") ?? "");
+  const okDay = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s);
+  if (!name || !contact || !okDay(from) || !okDay(to) || to < from || fd.get("consent") !== "1") backCal("wl_bad");
+  let ok = true;
+  try {
+    await db.run("INSERT INTO waitlist(id,tenant_id,service_id,client_name,contact,day_from,day_to,note,consent_contact,created_at) SELECT ?1,?2,?3,?4,?5,?6,?7,?8,1,?9 WHERE EXISTS (SELECT 1 FROM services WHERE id=?3 AND tenant_id=?2)",
+      [crypto.randomUUID(), tenantId, String(fd.get("service")), name, contact, from, to, String(fd.get("note") ?? "").slice(0, 200) || null, nowIso()]);
+  } catch { ok = false; }
+  if (!ok) backCal("wl_migration");
+  await audit(db, tenantId, "owner", "waitlist.add", `${from}..${to}`);
+  revalidatePath("/owner/calendar"); backCal("wl_added");
+}
+export async function setWaitlistStatus(fd: FormData) {
+  const { tenantId, db } = await guard();
+  const st = String(fd.get("status"));
+  if (!["waiting", "offered", "booked", "removed"].includes(st)) backCal("wl_bad");
+  await db.run("UPDATE waitlist SET status=?1 WHERE id=?2 AND tenant_id=?3", [st, String(fd.get("id")), tenantId]);
+  await audit(db, tenantId, "owner", "waitlist.status", `${String(fd.get("id"))} ${st}`);
+  revalidatePath("/owner/calendar"); backCal("wl_saved");
+}

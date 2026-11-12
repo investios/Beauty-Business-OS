@@ -1,4 +1,5 @@
 import { auditStmt, isOverlap, isUnique, js, nowIso, one, rows, uuid, type Db, type Param } from "./db";
+import { getServiceRules } from "./service-rules";
 import { addLocalDays, DEFAULT_TZ, formatLocal, localParts, weekdayOfLocalDate, zonedToUtc } from "./tz";
 
 
@@ -63,14 +64,20 @@ export async function getAvailability(db: Db, p: { tenantId: string; serviceId: 
   const earliest = now.getTime() + cfg.minNoticeMin * 60000;
   const latest = now.getTime() + cfg.horizonDays * 86400000;
   const exc = await listExceptions(db, p.tenantId, dayKey(lp));
+  const rulesBySvc = await getServiceRules(db, p.tenantId);
+  const rule = rulesBySvc.get(p.serviceId);
+  const before = (sid: string) => rulesBySvc.get(sid)?.bufferBeforeMin ?? 0;
   const out: (Slot & { staffId: string })[] = [];
 
   for (const st of staff) {
     const rules = await rows<{ weekday: number; start_min: number; end_min: number }>(db, "SELECT weekday,start_min,end_min FROM availability_rules WHERE staff_id=?1 AND tenant_id=?2", [st.id, p.tenantId]);
     const rangeStart = new Date(start.getTime() - 86400000).toISOString();
     const rangeEnd = new Date(start.getTime() + (days + 2) * 86400000).toISOString();
-    const busy = await rows<{ s: string; e: string }>(db, `SELECT start_at s, blocked_until e FROM appointments WHERE staff_id=?1 AND status IN ${ACTIVE} AND start_at < ?3 AND blocked_until > ?2 AND (?4 IS NULL OR id <> ?4)`, [st.id, rangeStart, rangeEnd, p.excludeAppointmentId ?? null]);
-    const busyMs = busy.map((b) => [new Date(b.s).getTime(), new Date(b.e).getTime()] as const);
+    const busy = await rows<{ s: string; e: string; sid: string }>(db, `SELECT start_at s, blocked_until e, service_id sid FROM appointments WHERE staff_id=?1 AND status IN ${ACTIVE} AND start_at < ?3 AND blocked_until > ?2 AND (?4 IS NULL OR id <> ?4)`, [st.id, rangeStart, rangeEnd, p.excludeAppointmentId ?? null]);
+    // занятость с учётом «подготовки до» каждой существующей записи
+    const busyMs = busy.map((b) => [new Date(b.s).getTime() - before(b.sid) * 60000, new Date(b.e).getTime()] as const);
+    const perDay = new Map<string, number>();
+    for (const b of busy) if (b.sid === p.serviceId) { const bl = localParts(new Date(b.s).getTime(), tz); const kk = dayKey(bl); perDay.set(kk, (perDay.get(kk) ?? 0) + 1); }
     for (let i = 0; i <= days; i++) {
       const day = addLocalDays(lp.y, lp.mo, lp.d, i);
       const wd = weekdayOfLocalDate(day.y, day.mo, day.d);
@@ -78,6 +85,8 @@ export async function getAvailability(db: Db, p: { tenantId: string; serviceId: 
       const dayExc = exc.filter((e) => e.day === k);
       const closedAll = dayExc.some((e) => e.kind === "closed" && e.start_min == null);
       if (closedAll) continue; // выходной: ни одного слота
+      if (rule && !rule.weekdays.includes(wd)) continue; // услуга в этот день недели не оказывается
+      if (rule?.maxPerDay != null && (perDay.get(k) ?? 0) >= rule.maxPerDay) continue; // дневной лимит услуги исчерпан
       const intervals = [
         ...rules.filter((x) => x.weekday === wd).map((x) => ({ a: x.start_min, b: x.end_min })),
         ...dayExc.filter((e) => e.kind === "open").map((e) => ({ a: e.start_min!, b: e.end_min! })),
@@ -87,12 +96,15 @@ export async function getAvailability(db: Db, p: { tenantId: string; serviceId: 
       for (const r of intervals) {
         for (let m = r.a; m + svc.duration_min <= r.b; m += cfg.stepMin) {
           if (seen.has(m)) continue; seen.add(m);
+          if (rule?.earliestMin != null && m < rule.earliestMin) continue;
+          if (rule?.latestMin != null && m > rule.latestMin) continue;
           if (closedRanges.some((c) => m < c.b && m + svc.duration_min > c.a)) continue;
           const z = zonedToUtc(day.y, day.mo, day.d, Math.floor(m / 60), m % 60, tz);
           if (z.status !== "ok") continue; // пропущенный/повторный час: явно не предлагаем
           const s = z.utcMs, e = s + svc.duration_min * 60000, blocked = e + svc.buffer_min * 60000;
           if (s < earliest || s > latest) continue;
-          if (busyMs.some(([bs, be]) => s < be && blocked > bs)) continue;
+          const from = s - (rule?.bufferBeforeMin ?? 0) * 60000;
+          if (busyMs.some(([bs, be]) => from < be && blocked > bs)) continue;
           out.push({ staffId: st.id, startUtc: new Date(s).toISOString(), endUtc: new Date(e).toISOString(), label: formatLocal(s, "en", tz) });
         }
       }
