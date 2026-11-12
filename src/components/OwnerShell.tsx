@@ -15,6 +15,7 @@ export default async function OwnerShell({ current, children }: { current: strin
           {NAV.map(([k, l]) => <a key={k} href={`/owner/${k}`} aria-current={current === k ? "page" : undefined}>{l}</a>)}
           <LogoutButton />
         </nav>
+        <form className="owner-search" role="search" action="/owner/search"><input type="search" name="q" placeholder="Поиск: имя, контакт, услуга" aria-label="Поиск по кабинету" /><button className="btn btn-secondary btn-sm" type="submit">Найти</button></form>
       </div></header>
       <main className="wrap owner-main">
         {tenant.is_demo && <p className="warnbox">Демо-режим: услуги, часы и тексты ИИ — заглушки. Реальные данные мастера пока не внесены.</p>}

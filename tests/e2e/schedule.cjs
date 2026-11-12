@@ -27,7 +27,7 @@ const SCHED = (base) => `${base}/owner/schedule`;
     await p.fill('form:has(select[name="kind"]) input[name="day"]', sunday); await p.selectOption('select[name="kind"]', "open");
     await p.fill('form:has(select[name="kind"]) input[name="from"]', "10:00"); await p.fill('form:has(select[name="kind"]) input[name="to"]', "12:00");
     await p.locator('form:has(select[name="kind"])').getByRole("button", { name: "Добавить" }).click(); await p.waitForSelector(`text=${sunday} · открыто`);
-    const sun = (await api()).filter((s) => s.startsWith(sunday)).map((s) => s.slice(11, 16));
+    const sun = (await api()).filter((s) => s.startsWith(sunday)).map((s) => new Date(s).toLocaleTimeString("en-GB", { timeZone: "Europe/Dublin", hour: "2-digit", minute: "2-digit" }));
     check(sun.join() === "10:00,11:00", "после открытия воскресенья клиенты видят 10:00 и 11:00 (" + sun.join() + ")");
     // закрыть субботу не нужно; закрываем ближайшую среду целиком
     const wed = iso(nextDow(3, 1));

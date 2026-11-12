@@ -266,3 +266,23 @@ textarea.kb { width: 100%; min-height: 96px; border: 1.5px solid #cbbfb2; border
 /* iOS Safari: поля даты и времени не должны быть шире колонки */
 .field input:not([type="checkbox"]), .sched-set input:not([type="checkbox"]), .sched-set select { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
 input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: none; min-height: 46px; display: block; }
+
+/* кабинет: плитки-ссылки, поиск, пагинация */
+.stat-link { display: grid; gap: 2px; text-decoration: none; color: inherit; transition: border-color .15s, transform .15s; }
+.stat-link:hover, .stat-link:focus-visible { border-color: var(--plum); }
+.stat-link:focus-visible { outline: 3px solid var(--plum); outline-offset: 2px; }
+.stat-link small { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.owner-search { display: flex; gap: 8px; margin-top: 10px; }
+.owner-search input { flex: 1; min-width: 0; min-height: 44px; border: 1.5px solid #cbbfb2; border-radius: 10px; padding: 8px 12px; font: 400 16px var(--ui); background: #fff; }
+.pager { align-items: center; margin-top: 14px; }
+.owner-top .wrap { flex-wrap: wrap; }
+.owner-search { flex: 1 1 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+.owner-search .btn { flex: none; }
+@media (min-width: 900px) { .owner-search { flex: 0 1 280px; margin-top: 0; } }
+.search { max-width: 100%; }
+.search input { min-width: 0; }
+.search .btn { flex: none; }
+.owner-main { grid-template-columns: minmax(0, 1fr); }
+.owner-main > * { min-width: 0; }
+.owner-main .item, .owner-main .item * { overflow-wrap: anywhere; }
+.owner-search .btn { background: #fff; color: var(--ink); border-color: #fff; }

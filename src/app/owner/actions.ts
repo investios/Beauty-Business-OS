@@ -148,31 +148,32 @@ export async function manualBooking(fd: FormData) {
 }
 
 /* ---------- Записи: подтвердить, перенести, отменить, отметить визит ---------- */
-const apptBack = (id: string, code: string) => redirect(`/owner/appointments/${id}?m=${code}`);
+const safeBack = (v: FormDataEntryValue | null) => { const s = String(v ?? ""); return /^\/owner\/[A-Za-z0-9\/?=&%._-]*$/.test(s) ? s : ""; };
+const apptBackOf = (fd: FormData, id: string, code: string) => { const b = safeBack(fd.get("back")); redirect(`/owner/appointments/${id}?m=${code}${b ? `&back=${encodeURIComponent(b)}` : ""}`); };
 export async function setApptStatus(fd: FormData) {
   const { tenantId, db } = await guard();
   const id = String(fd.get("id")), status = String(fd.get("status")) as OwnerStatus;
-  if (!["confirmed", "completed", "no_show"].includes(status)) apptBack(id, "error");
+  if (!["confirmed", "completed", "no_show"].includes(status)) apptBackOf(fd, id, "error");
   let code = "saved";
   try { await ownerSetStatus(db, { tenantId, id, status }); } catch { code = "error"; }
-  revalidatePath("/owner/appointments"); apptBack(id, code);
+  revalidatePath("/owner/appointments"); apptBackOf(fd, id, code);
 }
 export async function cancelAppt(fd: FormData) {
   const { tenantId, db } = await guard();
   const id = String(fd.get("id"));
   let code = "cancelled";
   try { await ownerCancelBooking(db, tenantId, id); } catch { code = "error"; }
-  revalidatePath("/owner/appointments"); apptBack(id, code);
+  revalidatePath("/owner/appointments"); apptBackOf(fd, id, code);
 }
 export async function rescheduleAppt(fd: FormData) {
   const { tenantId, db } = await guard();
   const id = String(fd.get("id"));
   const day = String(fd.get("day") ?? "").match(/^(\d{4})-(\d{2})-(\d{2})$/), min = toMin(fd.get("time"));
-  if (!day || min == null || min >= 1440) apptBack(id, "bad_time");
+  if (!day || min == null || min >= 1440) apptBackOf(fd, id, "bad_time");
   const z = zonedToUtc(+day![1], +day![2], +day![3], Math.floor(min! / 60), min! % 60);
-  if (z.status !== "ok") apptBack(id, "bad_time");
+  if (z.status !== "ok") apptBackOf(fd, id, "bad_time");
   let code = "moved";
   try { await ownerRescheduleBooking(db, { tenantId, id, newStartUtc: new Date((z as { utcMs: number }).utcMs).toISOString() }); }
   catch (e) { code = e instanceof BookingError && e.code === "slot_taken" ? "taken" : "error"; }
-  revalidatePath("/owner/appointments"); apptBack(id, code);
+  revalidatePath("/owner/appointments"); apptBackOf(fd, id, code);
 }

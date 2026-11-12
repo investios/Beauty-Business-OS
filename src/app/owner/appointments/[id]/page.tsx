@@ -11,8 +11,10 @@ const MSG: Record<string, [boolean, string]> = {
   bad_time: [false, "Проверьте дату и время"], taken: [false, "Это время занято другой записью"], error: [false, "Не удалось выполнить действие"],
 };
 
-export default async function Appointment({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ m?: string }> }) {
-  const { id } = await params; const { m } = await searchParams;
+export default async function Appointment({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ m?: string; back?: string }> }) {
+  const { id } = await params; const { m, back: rawBack } = await searchParams;
+  const back = rawBack && /^\/owner\/[A-Za-z0-9\/?=&%._-]*$/.test(rawBack) ? rawBack : "/owner/appointments";
+  const backName = back.startsWith("/owner/today") ? "Обзор" : back.startsWith("/owner/clients") ? "Клиент" : back.startsWith("/owner/search") ? "Поиск" : "Все записи";
   return (
     <OwnerShell current="appointments">
       {async (t) => {
@@ -29,7 +31,7 @@ export default async function Appointment({ params, searchParams }: { params: Pr
         const open = ["confirmed", "requested"].includes(a.status);
         const msg = m ? MSG[m] : undefined;
         return (<>
-          <p><a href="/owner/appointments">← Все записи</a></p>
+          <p><a href={back}>← {backName}</a></p>
           <h1>{a.name}</h1>
           {msg && <p className={msg[0] ? "msg-ok" : "msg-error"} role="status">{msg[1]}</p>}
           <section className="panel">
@@ -48,14 +50,14 @@ export default async function Appointment({ params, searchParams }: { params: Pr
             <section className="panel">
               <h2>Действия</h2>
               <div className="row" style={{ marginTop: 0 }}>
-                {a.status === "requested" && <form action={setApptStatus}><input type="hidden" name="id" value={a.id} /><input type="hidden" name="status" value="confirmed" /><button className="btn btn-primary" type="submit">Подтвердить</button></form>}
-                {a.status === "confirmed" && <form action={setApptStatus}><input type="hidden" name="id" value={a.id} /><input type="hidden" name="status" value="completed" /><button className="btn btn-secondary" type="submit">Визит состоялся</button></form>}
-                {a.status === "confirmed" && <form action={setApptStatus}><input type="hidden" name="id" value={a.id} /><input type="hidden" name="status" value="no_show" /><button className="btn btn-secondary" type="submit">Клиент не пришёл</button></form>}
-                <form action={cancelAppt}><input type="hidden" name="id" value={a.id} /><button className="btn btn-secondary" type="submit">Отменить запись</button></form>
+                {a.status === "requested" && <form action={setApptStatus}><input type="hidden" name="id" value={a.id} /><input type="hidden" name="back" value={back} /><input type="hidden" name="status" value="confirmed" /><button className="btn btn-primary" type="submit">Подтвердить</button></form>}
+                {a.status === "confirmed" && <form action={setApptStatus}><input type="hidden" name="id" value={a.id} /><input type="hidden" name="back" value={back} /><input type="hidden" name="status" value="completed" /><button className="btn btn-secondary" type="submit">Визит состоялся</button></form>}
+                {a.status === "confirmed" && <form action={setApptStatus}><input type="hidden" name="id" value={a.id} /><input type="hidden" name="back" value={back} /><input type="hidden" name="status" value="no_show" /><button className="btn btn-secondary" type="submit">Клиент не пришёл</button></form>}
+                <form action={cancelAppt}><input type="hidden" name="id" value={a.id} /><input type="hidden" name="back" value={back} /><button className="btn btn-secondary" type="submit">Отменить запись</button></form>
               </div>
               <h2 style={{ marginTop: 22 }}>Перенести на любое время</h2>
               <form action={rescheduleAppt} className="sched-set">
-                <input type="hidden" name="id" value={a.id} />
+                <input type="hidden" name="id" value={a.id} /><input type="hidden" name="back" value={back} />
                 <label className="field"><span>Дата</span><input type="date" name="day" defaultValue={day} required /></label>
                 <label className="field"><span>Время (любые минуты)</span><input type="time" name="time" defaultValue={time} required /></label>
                 <div className="row"><button className="btn btn-primary" type="submit">Перенести</button></div>
