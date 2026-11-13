@@ -1,3 +1,4 @@
+import { chooseSlot, confirmAction, declineAction, parseManageRef } from "@/lib/ai-actions";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb, one } from "@/lib/db";
@@ -79,7 +80,17 @@ async function route(req: Request, ctx: Ctx, method: "GET" | "POST") {
     if (method === "POST" && am) {
       if (!rateLimit(`ai:${ip}`, 20, 60_000)) return err(429, "rate_limited", "Too many requests");
       const b = z.object({ text: z.string().min(1).max(1000), locale: loc }).parse(await req.json());
+      if (parseManageRef(b.text) && !rateLimit(`aiverify:${ip}`, 10, 10 * 60_000)) return err(429, "rate_limited", "Too many requests"); // перебор ссылок управления записью
       return json(await handleMessage(db, { tenantId: tenant.id, conversationId: am[1], text: b.text, localeHint: b.locale }));
+    }
+    const act = seg.match(/^ai\/conversations\/([0-9a-f-]{36})\/actions\/([0-9a-f-]{36})\/(choose|confirm|decline)$/);
+    if (method === "POST" && act) {
+      if (!rateLimit(`aiact:${ip}`, 20, 60_000)) return err(429, "rate_limited", "Too many requests");
+      const b = z.object({ locale: loc, startUtc: z.string().datetime().optional() }).parse(await req.json());
+      const base = { tenantId: tenant.id, conversationId: act[1], actionId: act[2], locale: b.locale };
+      if (act[3] === "decline") return json(await declineAction(db, base));
+      if (act[3] === "confirm") return json(await confirmAction(db, base));
+      return json(await chooseSlot(db, { ...base, startUtc: z.string().datetime().parse(b.startUtc) }));
     }
     return err(404, "not_found", "Not found");
   } catch (e) {

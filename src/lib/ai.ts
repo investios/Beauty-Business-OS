@@ -3,6 +3,7 @@ import { getAvailability, listServices } from "./booking";
 import { formatLocal } from "./tz";
 import { hasPrefs, parseTimePrefs, slotMatches } from "./timeprefs";
 import { matchArticle } from "./library";
+import { CANCEL_RE, RESCHEDULE_RE, handleChangeRequest, parseManageRef, type PendingView } from "./ai-actions";
 import { runLlm, lastLlmError, lastModel, buildSystemPrompt, answerIsSafe, HANDOFF_TOKEN, type ChatMsg } from "./llm";
 
 export type Locale = "en" | "ru" | "uk";
@@ -10,7 +11,8 @@ export type Intent = "medical" | "human" | "booking" | "price" | "technique" | "
 
 export type AiReply = {
   message: string; locale: Locale; intent: Intent; knowledgeVersion: number | null; citations: string[];
-  slots?: { startUtc: string; label: string; serviceId: string }[];
+  slots?: { startUtc: string; label: string; serviceId: string; actionId?: string }[];
+  pending?: PendingView; // действие ждёт явного подтверждения клиента кнопкой
   articles?: { slug: string; title: string; href: string; draft: boolean }[];
   requiresHuman: boolean; handoffId?: string;
   toolResults: { tool: string; ok: boolean; detail?: string }[];
@@ -150,10 +152,19 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
   let engine: AiReply["engine"] = "scripted-demo";
   let handoffId: string | undefined;
 
-  await db.run("INSERT INTO messages(id,conversation_id,role,content,created_at) VALUES (?1,?2,'user',?3,?4)", [uuid(), conv.id, text, nowIso()]);
+  await db.run("INSERT INTO messages(id,conversation_id,role,content,created_at) VALUES (?1,?2,'user',?3,?4)", [uuid(), conv.id, text.replace(/token=[A-Za-z0-9_-]+/gi, "token=…"), nowIso()]); // секретный токен записи в журнал не пишем
   await db.run("UPDATE conversations SET locale=?2 WHERE id=?1", [conv.id, locale]);
 
   const primary = intents[0];
+  // Перенос и отмена записи: только по защищённой ссылке и только с подтверждением кнопкой (src/lib/ai-actions.ts)
+  const wantsCancel = CANCEL_RE.test(text), wantsMove = RESCHEDULE_RE.test(text);
+  if (primary !== "medical" && primary !== "human" && (parseManageRef(text) || wantsCancel || wantsMove)) {
+    const out = await handleChangeRequest(db, { tenantId: p.tenantId, conversationId: conv.id, text, locale, wants: wantsMove ? "reschedule" : wantsCancel ? "cancel" : null, now: p.now });
+    tools.push({ tool: "changeBooking", ok: !out.handoff, detail: out.pending ? "awaiting_confirmation" : out.slots ? "choose_slot" : out.handoff ? "unverified" : "info" });
+    if (out.handoff) { handoffId = await handoff(db, p.tenantId, conv.id, "change_booking", text.replace(/token=[A-Za-z0-9_-]+/gi, "token=…")); requiresHuman = true; tools.push({ tool: "requestHandoff", ok: true, detail: handoffId }); }
+    await db.run("INSERT INTO messages(id,conversation_id,role,content,knowledge_version,meta,created_at) VALUES (?1,?2,'assistant',?3,?4,?5,?6)", [uuid(), conv.id, out.message, kbv.version, js({ intents: ["booking"], citations, tools, engine }), nowIso()]);
+    return { message: out.message, locale, intent: "booking", knowledgeVersion: kbv.version, citations, slots: out.slots, pending: out.pending, requiresHuman, handoffId, toolResults: tools, engine };
+  }
   // Вопрос вне сценариев: пробуем модель (Cloudflare Workers AI) по утверждённым знаниям; при отказе, сбое или небезопасном ответе — передача мастеру
   let llmText: string | null = null;
   const llmEligible = intents.every((i) => ["unknown", "extensions", "technique", "preparation"].includes(i));

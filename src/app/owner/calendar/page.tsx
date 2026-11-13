@@ -4,6 +4,7 @@ import { getAvailability } from "@/lib/booking";
 import { STATUS } from "@/lib/owner-ui";
 import { addLocalDays, localParts, zonedToUtc } from "@/lib/tz";
 import { apptsInRange, isView, parseYmd, shiftAnchor, sickLeavePreview, todayYmd, viewRange, ymdKey, type CalAppt, type View } from "@/lib/calendar";
+import { ABSENCE_DRAFT, parseAbsence } from "@/lib/owner-assistant";
 import { addWaitlist, setWaitlistStatus } from "../actions";
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ function Chip({ a }: { a: CalAppt }) {
   );
 }
 
-export default async function CalendarPage({ searchParams }: { searchParams: Promise<{ view?: string; date?: string; m?: string; from?: string; to?: string }> }) {
+export default async function CalendarPage({ searchParams }: { searchParams: Promise<{ view?: string; date?: string; m?: string; from?: string; to?: string; q?: string }> }) {
   const sp = await searchParams;
   return (
     <OwnerShell current="calendar">
@@ -64,7 +65,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         }
 
         // Больничный: только просмотр затронутых записей
-        const sf = parseYmd(sp.from), st = parseYmd(sp.to);
+        const said = sp.q ? parseAbsence(sp.q.slice(0, 300), now) : null;
+        const sf = said?.ok ? said.from : parseYmd(sp.from), st = said?.ok ? said.to : parseYmd(sp.to);
         const sick = sf && st ? await sickLeavePreview(db, t.id, sf, st) : null;
 
         let wl: { id: string; service_id: string; client_name: string; contact: string; day_from: string; day_to: string; note: string | null; status: string; title_i18n: Record<string, string> }[] = [];
@@ -146,7 +148,15 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           <section className="panel" id="sick">
             <h2>Больничный: кого это затронет</h2>
             <p className="hint" style={{ marginTop: 0 }}>Выберите дни, когда вас не будет, и посмотрите, какие записи попадают в этот период. Это только просмотр: записи не меняются, клиентам ничего не отправляется.</p>
-            <form method="get" action="/owner/calendar" className="sched-set">
+            <form method="get" action="/owner/calendar#sick" className="sched-set">
+              <input type="hidden" name="view" value={view} />
+              <label className="field"><span>Или скажите помощнику своими словами</span><input type="text" name="q" defaultValue={sp.q ?? ""} maxLength={300} placeholder="Например: я заболела с 15 по 17 декабря" autoComplete="off" /></label>
+              <div className="row"><button className="btn btn-primary" type="submit">Понять и показать</button></div>
+            </form>
+            {said && (said.ok
+              ? <p role="status">Поняла так: <b>{said.understood}</b>. Если это не то, поправьте фразу или выберите даты ниже.</p>
+              : <p className="msg-error" role="status">{said.ask}</p>)}
+            <form method="get" action="/owner/calendar#sick" className="sched-set">
               <input type="hidden" name="view" value={view} />
               <label className="field"><span>С даты</span><input type="date" name="from" defaultValue={sp.from ?? ""} required /></label>
               <label className="field"><span>По дату</span><input type="date" name="to" defaultValue={sp.to ?? ""} required /></label>
@@ -156,6 +166,13 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
               <div role="status">
                 <p><b>{sick.total === 0 ? "Записей в этот период нет" : `Затронуто записей: ${sick.total}`}</b>. Ничего не изменено.</p>
                 {[...sick.byDay].map(([k, list]) => <div key={k}><h3>{k}</h3>{list.map((a) => <Chip key={a.id} a={a} />)}</div>)}
+                {sick.total > 0 && (
+                  <details>
+                    <summary><b>Черновик сообщения клиентам</b> (не отправляется)</summary>
+                    <p className="hint">Подставьте имя и дату. Отправку и перенос записей вы делаете сами: помощник ничего не меняет. Автоматическая рассылка подключится вместе с почтой.</p>
+                    {(["ru", "en", "uk"] as const).map((l) => <pre className="msg-pre" key={l}>{`[${l.toUpperCase()}] ${ABSENCE_DRAFT[l]}`}</pre>)}
+                  </details>
+                )}
               </div>
             ))}
           </section>

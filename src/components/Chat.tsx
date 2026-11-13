@@ -4,8 +4,10 @@ import type { Key } from "@/lib/i18n";
 import { api, captureSource, newKey } from "@/lib/client";
 import { msPerWord, tokens, totalMs } from "@/lib/typing";
 type Dict = Record<Key, string>;
-type Slot = { startUtc: string; label: string; serviceId: string };
-type Msg = { id: number; role: "bot" | "me" | "sys"; text: string; slots?: Slot[]; human?: boolean; anim?: boolean; articles?: { slug: string; title: string; href: string }[] };
+type Slot = { startUtc: string; label: string; serviceId: string; actionId?: string };
+type Pending = { id: string; kind: "cancel" | "reschedule"; summary: string };
+const CONF = { ru: ["Подтверждаю", "Не нужно"], en: ["Confirm", "No, keep it"], uk: ["Підтверджую", "Не потрібно"] } as const;
+type Msg = { id: number; role: "bot" | "me" | "sys"; text: string; slots?: Slot[]; human?: boolean; anim?: boolean; articles?: { slug: string; title: string; href: string }[]; pending?: Pending };
 
 const STORE = "mk-chat-v1";
 const KEEP_MS = 30 * 60 * 1000;
@@ -124,14 +126,28 @@ export default function Chat({ locale, d }: { locale: "en" | "ru" | "uk"; d: Dic
     e.preventDefault();
     const v = text.trim();
     if (!v || !convId || busy) return;
-    setText(""); setBusy(true); idleAsked.current = false; add({ role: "me", text: v });
+    setText(""); setBusy(true); idleAsked.current = false; add({ role: "me", text: v.replace(/token=[A-Za-z0-9_-]+/gi, "token=…") }); // секрет в окне и в памяти вкладки не показываем
     try {
       const r = await fetch(api(`ai/conversations/${convId}/messages`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: v, locale }) });
       if (!r.ok) throw new Error();
       const j = await r.json();
-      await deliver(j.message, { slots: j.slots, articles: j.articles });
+      await deliver(j.message, { slots: j.slots, articles: j.articles, pending: j.pending });
       if (j.requiresHuman) add({ role: "sys", text: d.chatHuman, human: true });
     } catch { setTyping(false); add({ role: "sys", text: d.chatError }); }
+    setBusy(false);
+  }
+
+  /** Перенос и отмена: ИИ только предлагает, меняет запись нажатие этой кнопки */
+  async function act(kind: "choose" | "confirm" | "decline", actionId: string, startUtc?: string) {
+    if (!convId || busy) return;
+    setBusy(true);
+    try {
+      const r = await fetch(api(`ai/conversations/${convId}/actions/${actionId}/${kind}`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale, startUtc }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error();
+      setMsgs((x) => x.map((m) => (m.pending?.id === actionId && kind !== "choose" ? { ...m, pending: undefined } : m.slots?.some((s) => s.actionId === actionId) && kind !== "choose" ? { ...m, slots: undefined } : m)));
+      await deliver(j.message, { pending: j.pending, slots: j.slots });
+    } catch { add({ role: "sys", text: d.chatError }); }
     setBusy(false);
   }
 
@@ -142,7 +158,7 @@ export default function Chat({ locale, d }: { locale: "en" | "ru" | "uk"; d: Dic
     try {
       const r = await fetch(api("bookings"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
         serviceId: pick.serviceId, startsAtUtc: pick.startUtc, idempotencyKey: keyRef.current,
-        client: { name: form.name, contact: form.contact, locale }, consentService: form.consent, source: { ...captureSource(), channel: "ai-chat" },
+        client: { name: form.name, contact: form.contact, locale }, consentService: form.consent, source: { ...captureSource(), channel: "ai-chat", ...(convId ? { conversation: convId } : {}) },
       }) });
       const j = await r.json();
       // «Записано» показываем только после подтверждения сервером
@@ -181,7 +197,13 @@ export default function Chat({ locale, d }: { locale: "en" | "ru" | "uk"; d: Dic
             )}
             {m.slots && m.slots.length > 0 && (
               <div className="chat-slots">
-                {m.slots.map((s) => <button key={s.startUtc} type="button" className="btn btn-secondary btn-sm" onClick={() => setPick(s)}>{s.label}</button>)}
+                {m.slots.map((s) => <button key={s.startUtc} type="button" className="btn btn-secondary btn-sm" onClick={() => (s.actionId ? void act("choose", s.actionId, s.startUtc) : setPick(s))}>{s.label}</button>)}
+              </div>
+            )}
+            {m.pending && (
+              <div className="chat-slots">
+                <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => void act("confirm", m.pending!.id)}>{CONF[locale][0]}</button>
+                <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => void act("decline", m.pending!.id)}>{CONF[locale][1]}</button>
               </div>
             )}
           </div>
