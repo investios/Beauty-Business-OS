@@ -16,7 +16,7 @@ export default async function Services({ params }: { params: Promise<{ locale: s
     <div className="pg"><div className="wrap">
       <div className="pg-head"><p className="eyebrow">MK Extension Studio</p><h1>{c.servicesTitle}</h1><p className="lead">{c.servicesLead}</p></div>
       <div className="hub-grid">
-        {HUBS.map((id) => <a key={id} className="hub-card" href={`/${locale}/services/${id}`}><h3>{c.hubs[id].title}</h3><p>{c.hubs[id].lead}</p><span className="more">{c.more}</span></a>)}
+        {HUBS.map((id) => <a key={id} className="hub-card" href={`/${locale}/services/${id}`}><h2>{c.hubs[id].title}</h2><p>{c.hubs[id].lead}</p><span className="more">{c.more}</span></a>)}
       </div>
     </div></div>
   );

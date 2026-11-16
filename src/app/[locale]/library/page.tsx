@@ -24,7 +24,7 @@ export default async function Library({ params, searchParams }: { params: Promis
         <a href={`/${locale}/library`} aria-current={!active ? "true" : undefined}>{l.all}</a>
         {CATS.map((c) => <a key={c} href={`/${locale}/library?cat=${c}`} aria-current={active === c ? "true" : undefined}>{l.cats[c]}</a>)}
       </nav>
-      {list.length ? <div className="art-list">{list.map((a) => <ArticleCard key={a.slug} a={a} locale={locale} />)}</div> : <p>—</p>}
+      {list.length ? <div className="art-list">{list.map((a) => <ArticleCard key={a.slug} a={a} locale={locale} level={2} />)}</div> : <p>—</p>}
     </div></div>
   );
 }
