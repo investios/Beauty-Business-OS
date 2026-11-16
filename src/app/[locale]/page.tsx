@@ -58,7 +58,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               const h = c.hubs[id], img = HUB_IMG[id];
               return (
                 <a key={id} className="tile" href={`/${locale}/services/${id}`}>
-                  <div className="t-body"><h3>{h.title}</h3><p>{h.tile}</p></div>
+                  <div className="t-body"><h2>{h.title}</h2><p>{h.tile}</p></div>
                   {img ? <img src={`/img/${img.a}.webp`} srcSet={`/img/${img.a}.webp ${img.wa}w, /img/${img.b}.webp ${img.wb}w`} sizes="(min-width: 1000px) 14vw, 45vw" alt="" loading="lazy" width={img.w} height={img.h} /> : <div className="t-art" aria-hidden="true">{art[id]}</div>}
                   <span className="go" aria-hidden="true"><IcArrow /></span>
                   <span className="sr-only">{c.more}</span>
