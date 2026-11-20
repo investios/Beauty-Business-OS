@@ -237,7 +237,7 @@ export async function createBooking(db: Db, input: BookingInput): Promise<Bookin
 
 /** Гостевой доступ только по неугадываемому токену ссылки управления записью. */
 export async function getBookingByToken(db: Db, tenantId: string, id: string, tokenStr: string) {
-  return one<{ id: string; status: string; start_at: string; end_at: string; service_id: string }>(db, "SELECT id,status,start_at,end_at,service_id FROM appointments WHERE id=?1 AND tenant_id=?2 AND manage_token=?3", [id, tenantId, tokenStr]);
+  return one<{ id: string; status: string; start_at: string; end_at: string; service_id: string; client_id: string | null }>(db, "SELECT id,status,start_at,end_at,service_id,client_id FROM appointments WHERE id=?1 AND tenant_id=?2 AND manage_token=?3", [id, tenantId, tokenStr]);
 }
 
 /** Лимит отмены для записи: условия на момент её создания, иначе текущее правило. Клиент не отменяет и не переносит сам ближе этого срока. */

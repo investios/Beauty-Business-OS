@@ -1,6 +1,7 @@
 import { auditStmt, nowIso, one, rows, uuid, type Db } from "./db";
 import { BookingError, cancelBooking, getAvailability, getBookingByToken, rescheduleBooking } from "./booking";
 import { formatLocal } from "./tz";
+import { recognizeClient } from "./client-context";
 
 /** Действия ИИ над записью клиента. Правила безопасности:
  *  1) запись находится только по секретной ссылке из подтверждения (id + token), по имени или телефону никогда;
@@ -67,6 +68,7 @@ export async function handleChangeRequest(db: Db, p: { tenantId: string; convers
   if (ref) {
     const b = await getBookingByToken(db, p.tenantId, ref.id, ref.token);
     if (!b) return { message: actionText("notFound", l), handoff: true };
+    if (b.client_id) await recognizeClient(db, p.tenantId, p.conversationId, b.client_id).catch(() => {});
     if (b.status !== "confirmed" || new Date(b.start_at) <= now) return { message: actionText("inactive", l), handoff: true };
     await db.run("UPDATE ai_pending_actions SET status='declined' WHERE conversation_id=?1 AND status IN ('awaiting_choice','awaiting_slot','pending')", [p.conversationId]);
     const id = uuid();

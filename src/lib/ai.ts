@@ -1,5 +1,7 @@
 import { getPolicies } from "./policies";
 import { addToWaitlist } from "./waitlist";
+import { HELLO, addAiNote, clientContext } from "./client-context";
+import { toolAllowed } from "./ai-tools";
 import { audit, js, nowIso, one, rows, uuid, type Db } from "./db";
 import { getAvailability, listServices } from "./booking";
 import { formatLocal } from "./tz";
@@ -132,6 +134,13 @@ export async function startConversation(db: Db, p: { tenantId: string; locale: L
   return { conversationId: c.id, message: text };
 }
 
+/** Приветствие по имени один раз за диалог и только если клиент узнан по защищённой ссылке записи */
+async function greetOnce(db: Db, tenantId: string, convId: string, locale: Locale, now?: Date): Promise<string | null> {
+  const who = await clientContext(db, tenantId, convId, now);
+  if (!who || (await one(db, "SELECT 1 x FROM messages WHERE conversation_id=?1 AND json_extract(meta,'$.recognized')=1 LIMIT 1", [convId]))) return null;
+  return HELLO[locale](who.firstName);
+}
+
 async function handoff(db: Db, tenantId: string, conversationId: string, reason: string, userText: string): Promise<string> {
   const existing = await one<{ id: string }>(db, "SELECT id FROM handoffs WHERE conversation_id=?1 AND status='open' ORDER BY rowid DESC LIMIT 1", [conversationId]);
   if (existing) return existing.id;
@@ -140,6 +149,8 @@ async function handoff(db: Db, tenantId: string, conversationId: string, reason:
   const hid = uuid();
   await db.run("INSERT INTO handoffs(id,tenant_id,conversation_id,reason,summary,created_at) VALUES (?1,?2,?3,?4,?5,?6)", [hid, tenantId, conversationId, reason, summary, nowIso()]);
   await audit(db, tenantId, "ai", "handoff.create", hid, { reason });
+  const known = await clientContext(db, tenantId, conversationId);
+  if (known && toolAllowed("addAiNote")) await addAiNote(db, tenantId, known.clientId, `клиент задал вопрос мастеру (${reason}): ${summary.slice(0, 200)}`);
   return hid;
 }
 
@@ -160,6 +171,7 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
   let requiresHuman = false;
   let engine: AiReply["engine"] = "scripted-demo";
   let handoffId: string | undefined;
+  let recognized = false;
 
   await db.run("INSERT INTO messages(id,conversation_id,role,content,created_at) VALUES (?1,?2,'user',?3,?4)", [uuid(), conv.id, text.replace(/token=[A-Za-z0-9_-]+/gi, "token=…"), nowIso()]); // секретный токен записи в журнал не пишем
   await db.run("UPDATE conversations SET locale=?2 WHERE id=?1", [conv.id, locale]);
@@ -171,8 +183,11 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
     const out = await handleChangeRequest(db, { tenantId: p.tenantId, conversationId: conv.id, text, locale, wants: wantsMove ? "reschedule" : wantsCancel ? "cancel" : null, now: p.now });
     tools.push({ tool: "changeBooking", ok: !out.handoff, detail: out.pending ? "awaiting_confirmation" : out.slots ? "choose_slot" : out.handoff ? "unverified" : "info" });
     if (out.handoff) { handoffId = await handoff(db, p.tenantId, conv.id, "change_booking", text.replace(/token=[A-Za-z0-9_-]+/gi, "token=…")); requiresHuman = true; tools.push({ tool: "requestHandoff", ok: true, detail: handoffId }); }
-    await db.run("INSERT INTO messages(id,conversation_id,role,content,knowledge_version,meta,created_at) VALUES (?1,?2,'assistant',?3,?4,?5,?6)", [uuid(), conv.id, out.message, kbv.version, js({ intents: ["booking"], citations, tools, engine }), nowIso()]);
-    return { message: out.message, locale, intent: "booking", knowledgeVersion: kbv.version, citations, slots: out.slots, pending: out.pending, requiresHuman, handoffId, toolResults: tools, engine };
+    const hi = await greetOnce(db, p.tenantId, conv.id, locale, p.now);
+    const msg = hi ? `${hi} ${out.message}` : out.message;
+    if (hi) tools.push({ tool: "recognizeClient", ok: true, detail: "greeted" });
+    await db.run("INSERT INTO messages(id,conversation_id,role,content,knowledge_version,meta,created_at) VALUES (?1,?2,'assistant',?3,?4,?5,?6)", [uuid(), conv.id, msg, kbv.version, js({ intents: ["booking"], citations, tools, engine, recognized: !!hi }), nowIso()]);
+    return { message: msg, locale, intent: "booking", knowledgeVersion: kbv.version, citations, slots: out.slots, pending: out.pending, requiresHuman, handoffId, toolResults: tools, engine };
   }
   // Вопрос вне сценариев: пробуем модель (Cloudflare Workers AI) по утверждённым знаниям; при отказе, сбое или небезопасном ответе — передача мастеру
   let llmText: string | null = null;
@@ -260,7 +275,9 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
   }
 
   if (requiresHuman && (await getPolicies(db, p.tenantId)).values.master_busy) parts.push(T.busy[locale]);
+  const hello = await greetOnce(db, p.tenantId, conv.id, locale, p.now);
+  if (hello) { parts.unshift(hello); tools.push({ tool: "recognizeClient", ok: true, detail: "greeted" }); recognized = true; }
   const message = parts.join("\n\n");
-  await db.run("INSERT INTO messages(id,conversation_id,role,content,knowledge_version,meta,created_at) VALUES (?1,?2,'assistant',?3,?4,?5,?6)", [uuid(), conv.id, message, kbv.version, js({ intents, citations, tools, engine }), nowIso()]);
+  await db.run("INSERT INTO messages(id,conversation_id,role,content,knowledge_version,meta,created_at) VALUES (?1,?2,'assistant',?3,?4,?5,?6)", [uuid(), conv.id, message, kbv.version, js({ intents, citations, tools, engine, recognized }), nowIso()]);
   return { message, locale, intent: primary, knowledgeVersion: kbv.version, citations, slots, articles, requiresHuman, handoffId, toolResults: tools, engine };
 }
