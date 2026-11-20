@@ -49,3 +49,33 @@ export async function ownerTenant() {
   const db = await getDb();
   return one<{ id: string; name: string; slug: string; is_demo: boolean }>(db, "SELECT id,name,slug,is_demo FROM tenants WHERE id=?1", [s.tenantId]);
 }
+
+/* ---------- Консультант: отдельный вход, отдельная кука и пароль; владелец и консультант друг к другу доступа не имеют ---------- */
+export const CONSULTANT_COOKIE = "consultant_session";
+/** Пароль консультанта из переменной CONSULTANT_PASSWORD. В боевой среде без неё вход выключен. */
+export function consultantPassword(): string | null {
+  const p = process.env.CONSULTANT_PASSWORD;
+  if (p) return p;
+  return process.env.NODE_ENV === "production" ? null : "demo-consultant";
+}
+const csign = (v: string) => createHmac("sha256", secret()).update(`consultant:${v}`).digest("base64url");
+export function makeConsultantSession(tenantId: string): string {
+  const body = Buffer.from(JSON.stringify({ t: tenantId, r: "consultant", exp: Date.now() + TTL_MS })).toString("base64url");
+  return `${body}.${csign(body)}`;
+}
+export function readConsultantSession(token: string | undefined): { tenantId: string } | null {
+  if (!token) return null;
+  const [body, sig] = token.split(".");
+  if (!body || !sig || !safeEqual(sig, csign(body))) return null;
+  try {
+    const p = JSON.parse(Buffer.from(body, "base64url").toString());
+    if (p.r !== "consultant" || typeof p.t !== "string" || typeof p.exp !== "number" || p.exp < Date.now()) return null;
+    return { tenantId: p.t };
+  } catch { return null; }
+}
+export async function consultantTenant() {
+  const jar = await cookies();
+  const s = readConsultantSession(jar.get(CONSULTANT_COOKIE)?.value);
+  if (!s) return null;
+  return one<{ id: string; name: string }>(await getDb(), "SELECT id,name FROM tenants WHERE id=?1", [s.tenantId]);
+}
