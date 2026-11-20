@@ -311,3 +311,12 @@ export async function saveReview(fd: FormData) {
   const { addReview } = await import("@/lib/client-model");
   await clientAction(fd, ({ db, tenantId }, id) => addReview(db, tenantId, id, Number(fd.get("rating")), String(fd.get("body") ?? ""), "owner"), "review");
 }
+
+/** Ответ мастера клиенту в его диалог */
+export async function replyHandoff(fd: FormData) {
+  const { tenantId, db } = await guard();
+  const { replyToHandoff } = await import("@/lib/master-replies");
+  const ok = await replyToHandoff(db, tenantId, String(fd.get("id")), String(fd.get("text") ?? ""), "owner");
+  revalidatePath("/owner/ai");
+  redirect(`/owner/ai?m=${ok ? "replied" : "bad"}`);
+}

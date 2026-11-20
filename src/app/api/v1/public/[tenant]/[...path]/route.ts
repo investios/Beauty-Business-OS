@@ -83,6 +83,12 @@ async function route(req: Request, ctx: Ctx, method: "GET" | "POST") {
       if (parseManageRef(b.text) && !rateLimit(`aiverify:${ip}`, 10, 10 * 60_000)) return err(429, "rate_limited", "Too many requests"); // перебор ссылок управления записью
       return json(await handleMessage(db, { tenantId: tenant.id, conversationId: am[1], text: b.text, localeHint: b.locale }));
     }
+    const rp = seg.match(/^ai\/conversations\/([0-9a-f-]{36})\/replies$/);
+    if (method === "GET" && rp) {
+      if (!rateLimit(`aireplies:${ip}`, 60, 60_000)) return err(429, "rate_limited", "Too many requests");
+      const { masterRepliesSince } = await import("@/lib/master-replies");
+      return json({ replies: await masterRepliesSince(db, tenant.id, rp[1], url.searchParams.get("after") ?? "") });
+    }
     const act = seg.match(/^ai\/conversations\/([0-9a-f-]{36})\/actions\/([0-9a-f-]{36})\/(choose|confirm|decline)$/);
     if (method === "POST" && act) {
       if (!rateLimit(`aiact:${ip}`, 20, 60_000)) return err(429, "rate_limited", "Too many requests");

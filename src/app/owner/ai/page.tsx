@@ -1,16 +1,19 @@
 import OwnerShell from "@/components/OwnerShell";
 import { getDb, rows } from "@/lib/db";
 import { formatLocal } from "@/lib/tz";
-import { activateVersion, approveDraft, publishVersion, resolveHandoff, saveDraft } from "../actions";
+import { activateVersion, approveDraft, publishVersion, replyHandoff, resolveHandoff, saveDraft } from "../actions";
+import { getPolicies } from "@/lib/policies";
 export const dynamic = "force-dynamic";
 
 const REASON: Record<string, string> = { medical: "медицинский вопрос", out_of_knowledge: "нет утверждённого ответа", client_requested_human: "клиент просит человека", no_slots: "нет свободного времени" };
 
-export default function AiPage() {
+export default async function AiPage({ searchParams }: { searchParams: Promise<{ m?: string }> }) {
+  const m = (await searchParams).m;
   return (
     <OwnerShell current="ai">
       {async (t) => {
         const db = await getDb();
+        const busy = (await getPolicies(db, t.id)).values.master_busy === 1;
         const hs = await rows<{ id: string; reason: string; summary: string; contact: string | null; status: string; created_at: string }>(db, "SELECT id,reason,summary,contact,status,created_at FROM handoffs WHERE tenant_id=?1 ORDER BY (status='open') DESC, created_at DESC LIMIT 30", [t.id]);
         const arts = await rows<{ id: string; key: string; locale: string; title: string; answer: string; draft_answer: string | null; approved_by: string | null }>(db, "SELECT id,key,locale,title,answer,draft_answer,approved_by FROM knowledge_articles WHERE tenant_id=?1 ORDER BY key, locale", [t.id]);
         const vs = await rows<{ version: number; approved_by: string; active: boolean; created_at: string }>(db, "SELECT version,approved_by,active,created_at FROM knowledge_versions WHERE tenant_id=?1 ORDER BY version DESC", [t.id]);
@@ -18,6 +21,9 @@ export default function AiPage() {
         const drafts = arts.filter((a) => a.draft_answer).length;
         return (<>
           <h1>ИИ и вопросы</h1>
+          {m === "replied" && <p className="msg-ok" role="status">Ответ отправлен в чат клиента. Если клиент закрыл чат, он увидит его при следующем открытии.</p>}
+          {m === "bad" && <p className="msg-error" role="status">Напишите текст ответа</p>}
+          {busy && <p className="warnbox">Включён режим «мастер занят»: ИИ предупреждает клиентов, что вы ответите позже. Выключить можно в <a href="/owner/settings">Настройках</a>.</p>}
           <section><h2>Вопросы, которые ИИ передал вам</h2>
             {hs.length === 0 && <p>Пока нет.</p>}
             <div className="list">{hs.map((h) => (
@@ -25,6 +31,7 @@ export default function AiPage() {
                 <div className="top"><span>{REASON[h.reason] ?? h.reason}</span><span className={`badge ${h.status === "open" ? "warn" : "ok"}`}>{h.status === "open" ? "ждёт ответа" : "закрыто"}</span></div>
                 <small>{h.summary}</small>
                 <small>Контакт: {h.contact ?? "клиент пока не оставил"} · {formatLocal(new Date(h.created_at).getTime(), "ru")}</small>
+                {h.status === "open" && <form action={replyHandoff} className="sched-set"><input type="hidden" name="id" value={h.id} /><label className="field"><span>Ответ клиенту в чат</span><textarea name="text" rows={2} maxLength={1500} required /></label><div className="row"><button className="btn btn-primary btn-sm" type="submit">Отправить ответ</button></div></form>}
                 {h.status === "open" && <form action={resolveHandoff}><input type="hidden" name="id" value={h.id} /><button className="btn btn-secondary btn-sm" type="submit">Отметить как решённый</button></form>}
               </div>))}</div>
           </section>

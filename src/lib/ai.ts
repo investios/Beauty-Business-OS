@@ -1,3 +1,4 @@
+import { getPolicies } from "./policies";
 import { audit, js, nowIso, one, rows, uuid, type Db } from "./db";
 import { getAvailability, listServices } from "./booking";
 import { formatLocal } from "./tz";
@@ -85,6 +86,11 @@ const T = {
     en: "Of course. I've passed this to the specialist. Please leave a phone number or email so they can reach you.",
     ru: "Конечно. Я передал это мастеру. Оставьте телефон или почту, чтобы он мог с вами связаться.",
     uk: "Звісно. Я передав це майстру. Залиште телефон або пошту, щоб він міг зв'язатися з вами.",
+  },
+  busy: {
+    en: "The specialist is with a client right now and will reply as soon as she is free.",
+    ru: "Мастер сейчас на процедуре и ответит, как только освободится.",
+    uk: "Майстер зараз на процедурі й відповість, щойно звільниться.",
   },
   unknown: {
     en: "I don't have approved information on that, and I don't want to guess. I've passed your question to the specialist. Please leave a phone number or email so they can answer you.",
@@ -244,6 +250,7 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
     }
   }
 
+  if (requiresHuman && (await getPolicies(db, p.tenantId)).values.master_busy) parts.push(T.busy[locale]);
   const message = parts.join("\n\n");
   await db.run("INSERT INTO messages(id,conversation_id,role,content,knowledge_version,meta,created_at) VALUES (?1,?2,'assistant',?3,?4,?5,?6)", [uuid(), conv.id, message, kbv.version, js({ intents, citations, tools, engine }), nowIso()]);
   return { message, locale, intent: primary, knowledgeVersion: kbv.version, citations, slots, articles, requiresHuman, handoffId, toolResults: tools, engine };

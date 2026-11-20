@@ -3,7 +3,7 @@ import { auditStmt, nowIso, one, rows, uuid, type Db } from "@/lib/db";
 /** Реестр правил бизнеса. Значения по умолчанию взяты из ТЗ v2.0; мастер меняет их в «Настройках». */
 export type PolicyKey =
   | "cancel_limit_hours" | "remind_evening_before" | "remind_two_days" | "remind_two_days_min_ahead_days" | "remind_morning" | "remind_one_hour"
-  | "followup_after_hours" | "rebook_after_days";
+  | "followup_after_hours" | "rebook_after_days" | "master_busy";
 type Def = { label: string; hint: string; kind: "int" | "bool"; def: number; min?: number; max?: number; unit?: string };
 export const POLICY_DEFS: Record<PolicyKey, Def> = {
   cancel_limit_hours: { label: "Отмена и перенос клиентом не позже, чем за", hint: "Ближе этого срока ИИ и ссылка не отменяют запись сами, а передают вопрос мастеру", kind: "int", def: 12, min: 0, max: 168, unit: "ч" },
@@ -13,6 +13,7 @@ export const POLICY_DEFS: Record<PolicyKey, Def> = {
   remind_morning: { label: "Напоминание утром в день визита", hint: "Выключено по умолчанию. Уходит в 09:00", kind: "bool", def: 0 },
   remind_one_hour: { label: "Напоминание за час до визита", hint: "Выключено по умолчанию", kind: "bool", def: 0 },
   followup_after_hours: { label: "Спросить, как прошла процедура, через", hint: "После того как мастер отметил визит состоявшимся", kind: "int", def: 24, min: 2, max: 168, unit: "ч" },
+  master_busy: { label: "Режим «мастер занят»", hint: "ИИ предупреждает клиентов, что вы сейчас на процедуре и ответите позже. Запись и справочные ответы работают как обычно", kind: "bool", def: 0 },
   rebook_after_days: { label: "Предложить повторный визит через", hint: "Только клиентам с согласием на предложения. Значение тестовое, уточняется по каждой услуге", kind: "int", def: 28, min: 7, max: 365, unit: "дн" },
 };
 export const POLICY_KEYS = Object.keys(POLICY_DEFS) as PolicyKey[];

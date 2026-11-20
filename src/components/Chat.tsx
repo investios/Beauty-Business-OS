@@ -7,7 +7,7 @@ type Dict = Record<Key, string>;
 type Slot = { startUtc: string; label: string; serviceId: string; actionId?: string };
 type Pending = { id: string; kind: "cancel" | "reschedule"; summary: string };
 const CONF = { ru: ["Подтверждаю", "Не нужно"], en: ["Confirm", "No, keep it"], uk: ["Підтверджую", "Не потрібно"] } as const;
-type Msg = { id: number; role: "bot" | "me" | "sys"; text: string; slots?: Slot[]; human?: boolean; anim?: boolean; articles?: { slug: string; title: string; href: string }[]; pending?: Pending };
+type Msg = { id: number; role: "bot" | "me" | "sys"; text: string; slots?: Slot[]; human?: boolean; rid?: string; anim?: boolean; articles?: { slug: string; title: string; href: string }[]; pending?: Pending };
 
 const STORE = "mk-chat-v1";
 const KEEP_MS = 30 * 60 * 1000;
@@ -120,6 +120,27 @@ export default function Chat({ locale, d }: { locale: "en" | "ru" | "uk"; d: Dic
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);
   });
+  // Мастер ответил из кабинета: после передачи вопроса раз в 15 секунд проверяем, нет ли ответа
+  const waiting = msgs.some((m) => m.human);
+  useEffect(() => {
+    if (!open || !convId || !waiting) return;
+    let stop = false;
+    const tick = async () => {
+      try {
+        const r = await fetch(api(`ai/conversations/${convId}/replies`));
+        if (!r.ok || stop) return;
+        const j = (await r.json()) as { replies: { id: string; content: string }[] };
+        setMsgs((x) => {
+          const fresh = j.replies.filter((q) => !x.some((m) => m.rid === q.id));
+          return fresh.length ? [...x, ...fresh.map((q) => ({ id: ++idRef.current, role: "bot" as const, text: q.content, rid: q.id }))] : x;
+        });
+      } catch { /* повторим на следующем шаге */ }
+    };
+    void tick();
+    const t = setInterval(tick, 15000);
+    return () => { stop = true; clearInterval(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, convId, waiting]);
   function close() { setOpen(false); trigger.current?.focus?.(); }
 
   async function send(e: React.FormEvent) {
