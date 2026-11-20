@@ -51,7 +51,7 @@ describe("расписание мастера", () => {
   it("длинная услуга блокирует следующих клиентов на всё своё время", async () => {
     const c = await setup();
     const ext = c.services.find((x) => x.slug !== "consultation")!;
-    await c.db.run("UPDATE services SET duration_min=240,buffer_min=0 WHERE id=?1", [ext.id]);
+    await c.db.run("UPDATE services SET duration_min=240,buffer_min=0 WHERE id=?1", [ext.id]); await c.db.run("UPDATE services SET buffer_min=15 WHERE id=?1", [c.consult.id]);
     const first = (await avail(c, ext.id)).find((x) => x.startUtc === "2026-11-10T09:00:00.000Z")!;
     await createBooking(c.db, { tenantId: c.tenantId, serviceId: ext.id, startsAtUtc: first.startUtc, client: person(), idempotencyKey: key(), consentService: true, now: NOW });
     const t = (await avail(c, c.consult.id)).filter((x) => dayOf(x.startUtc) === "2026-11-10").map((x) => x.startUtc.slice(11, 16));

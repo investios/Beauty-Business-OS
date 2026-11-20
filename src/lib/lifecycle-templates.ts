@@ -1,11 +1,11 @@
 import type { Loc } from "./i18n";
 
-export type MsgKind = "booking_confirmation" | "reminder_24h" | "followup" | "rebook";
+export type MsgKind = "booking_confirmation" | "reminder_24h" | "reminder_2d" | "reminder_morning" | "reminder_1h" | "followup" | "rebook";
 export const KIND_LABEL: Record<MsgKind, string> = {
-  booking_confirmation: "Подтверждение записи", reminder_24h: "Напоминание за сутки", followup: "Как прошёл визит", rebook: "Приглашение на повторный визит",
+  booking_confirmation: "Подтверждение записи", reminder_24h: "Напоминание вечером накануне", reminder_2d: "Напоминание за 2 дня", reminder_morning: "Напоминание утром в день визита", reminder_1h: "Напоминание за час", followup: "Как прошёл визит", rebook: "Приглашение на повторный визит",
 };
 /** Служебные сообщения нужны для самой записи; рекламные требуют отдельного согласия на маркетинг */
-export const IS_MARKETING: Record<MsgKind, boolean> = { booking_confirmation: false, reminder_24h: false, followup: false, rebook: true };
+export const IS_MARKETING: Record<MsgKind, boolean> = { booking_confirmation: false, reminder_24h: false, reminder_2d: false, reminder_morning: false, reminder_1h: false, followup: false, rebook: true };
 
 export type Vars = { name: string; salon: string; service: string; when: string; manageUrl: string };
 type T = { subject: string; body: string };
@@ -20,6 +20,21 @@ const T_: Record<MsgKind, Record<Loc, T>> = {
     ru: { subject: "Напоминаем о записи завтра: {when}", body: "Здравствуйте, {name}!\n\nНапоминаем: «{service}», {when}.\n\nЕсли планы изменились, перенесите или отмените запись заранее: {manageUrl}\n\nДо встречи!\n{salon}" },
     en: { subject: "Reminder: your appointment is tomorrow, {when}", body: "Hello {name},\n\nA reminder about “{service}”, {when}.\n\nIf your plans change, please reschedule or cancel in advance: {manageUrl}\n\nSee you soon,\n{salon}" },
     uk: { subject: "Нагадуємо про запис завтра: {when}", body: "Вітаємо, {name}!\n\nНагадуємо: «{service}», {when}.\n\nЯкщо плани змінилися, перенесіть або скасуйте запис заздалегідь: {manageUrl}\n\nДо зустрічі!\n{salon}" },
+  },
+  reminder_2d: {
+    ru: { subject: "Через 2 дня ваша запись: {when}", body: "Здравствуйте, {name}!\n\nНапоминаем: «{service}», {when}. Подтвердить, перенести или отменить запись можно по ссылке: {manageUrl}\n\nДо встречи!\n{salon}" },
+    en: { subject: "Your appointment in 2 days: {when}", body: "Hello {name},\n\nA reminder about “{service}”, {when}. You can confirm, reschedule or cancel here: {manageUrl}\n\nSee you soon,\n{salon}" },
+    uk: { subject: "Через 2 дні ваш запис: {when}", body: "Вітаємо, {name}!\n\nНагадуємо: «{service}», {when}. Підтвердити, перенести або скасувати запис можна за посиланням: {manageUrl}\n\nДо зустрічі!\n{salon}" },
+  },
+  reminder_morning: {
+    ru: { subject: "Сегодня ваша запись: {when}", body: "Доброе утро, {name}!\n\nСегодня вас ждут: «{service}», {when}. Если что-то изменилось, напишите заранее: {manageUrl}\n\n{salon}" },
+    en: { subject: "Your appointment is today: {when}", body: "Good morning {name},\n\nWe look forward to seeing you today: “{service}”, {when}. If anything changes, please let us know: {manageUrl}\n\n{salon}" },
+    uk: { subject: "Сьогодні ваш запис: {when}", body: "Доброго ранку, {name}!\n\nСьогодні на вас чекають: «{service}», {when}. Якщо щось змінилося, напишіть заздалегідь: {manageUrl}\n\n{salon}" },
+  },
+  reminder_1h: {
+    ru: { subject: "Ждём вас через час: {when}", body: "Здравствуйте, {name}! Напоминаем: «{service}», {when}. Если опаздываете, сообщите по ссылке: {manageUrl}\n\n{salon}" },
+    en: { subject: "See you in an hour: {when}", body: "Hello {name}, a reminder: “{service}”, {when}. If you are running late, let us know here: {manageUrl}\n\n{salon}" },
+    uk: { subject: "Чекаємо на вас за годину: {when}", body: "Вітаємо, {name}! Нагадуємо: «{service}», {when}. Якщо запізнюєтесь, повідомте за посиланням: {manageUrl}\n\n{salon}" },
   },
   followup: {
     ru: { subject: "Как всё прошло?", body: "Здравствуйте, {name}!\n\nСпасибо, что были у нас. Если есть вопросы после визита, просто ответьте на это письмо, мастер посмотрит.\n\n{salon}" },

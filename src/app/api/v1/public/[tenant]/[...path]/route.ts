@@ -16,7 +16,7 @@ const err = (status: number, code: string, message: string, extra: object = {}) 
 
 function bookingErr(e: unknown) {
   if (e instanceof BookingError) {
-    const status = e.code === "slot_taken" ? 409 : e.code === "slot_unavailable" ? 409 : e.code === "not_found" ? 404 : 400;
+    const status = e.code === "slot_taken" || e.code === "too_late" ? 409 : e.code === "slot_unavailable" ? 409 : e.code === "not_found" ? 404 : 400;
     return err(status, e.code, e.message, { alternatives: e.alternatives });
   }
   console.error("booking api error", e instanceof Error ? e.message : e);

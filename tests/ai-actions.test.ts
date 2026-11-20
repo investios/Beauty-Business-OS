@@ -6,7 +6,7 @@ import { chooseSlot, confirmAction, declineAction, parseManageRef } from "@/lib/
 
 type Ctx = Awaited<ReturnType<typeof setup>>;
 async function booked(c: Ctx, i = 1) {
-  const s = (await getAvailability(c.db, { tenantId: c.tenantId, serviceId: c.consult.id, now: NOW, days: 10 }))[3];
+  const s = (await getAvailability(c.db, { tenantId: c.tenantId, serviceId: c.consult.id, now: NOW, days: 10 })).filter((x) => new Date(x.startUtc).getTime() > NOW.getTime() + 36 * 3600000)[3];
   const r = await createBooking(c.db, { tenantId: c.tenantId, serviceId: c.consult.id, startsAtUtc: s.startUtc, client: person(i), idempotencyKey: key(), consentService: true, now: NOW });
   const link = `https://example.test/ru/manage/${r.appointmentId}?token=${r.manageToken}`;
   return { ...r, start: s.startUtc, link };
@@ -66,6 +66,17 @@ describe("ИИ: перенос и отмена записи", () => {
     const idB = await conv(c, c.tenantB);
     expect((await say(c, idB, `отменить ${b.link}`, c.tenantB)).pending).toBeUndefined();
     expect((await status(c, b.appointmentId)).status).toBe("confirmed");
+  });
+  it("слишком близко к визиту: ИИ не отменяет, запись цела, вопрос уходит мастеру", async () => {
+    const c = await setup(); const id = await conv(c);
+    const near = (await getAvailability(c.db, { tenantId: c.tenantId, serviceId: c.consult.id, now: NOW, days: 3 })).find((x) => { const t = new Date(x.startUtc).getTime(); return t > NOW.getTime() + 3600000 && t < NOW.getTime() + 11 * 3600000; })!;
+    const r0 = await createBooking(c.db, { tenantId: c.tenantId, serviceId: c.consult.id, startsAtUtc: near.startUtc, client: person(9), idempotencyKey: key(), consentService: true, now: NOW });
+    const link = `https://example.test/ru/manage/${r0.appointmentId}?token=${r0.manageToken}`;
+    const r = await say(c, id, `Пожалуйста отмените запись ${link}`);
+    const out = await confirmAction(c.db, { tenantId: c.tenantId, conversationId: id, actionId: r.pending!.id, locale: "ru", now: NOW });
+    expect(out.ok).toBe(false); expect(out.message).toMatch(/передал/);
+    expect((await status(c, r0.appointmentId)).status).toBe("confirmed");
+    expect((await c.db.all("SELECT 1 FROM handoffs WHERE conversation_id=?1 AND reason='late_change' AND status='open'", [id])).length).toBe(1);
   });
   it("отказ клиента ничего не меняет", async () => {
     const c = await setup(); const b = await booked(c); const id = await conv(c);

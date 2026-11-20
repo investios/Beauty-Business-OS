@@ -248,3 +248,31 @@ export async function resetLifecycleSimulation() {
   revalidatePath("/owner/messages");
   redirect("/owner/messages?m=reset");
 }
+
+/** Правила бизнеса: сохраняет только изменённые значения, каждое пишется в историю */
+export async function savePolicies(fd: FormData) {
+  const { tenantId, db } = await guard();
+  const { getPolicies, setPolicy, POLICY_DEFS, POLICY_KEYS } = await import("@/lib/policies");
+  const cur = await getPolicies(db, tenantId);
+  if (!cur.persisted) redirect("/owner/settings?m=migration");
+  let changed = 0, bad = 0;
+  for (const k of POLICY_KEYS) {
+    const d = POLICY_DEFS[k];
+    const raw = d.kind === "bool" ? (fd.get(k) ? 1 : 0) : fd.get(k);
+    if (raw === null || raw === "") continue;
+    const r = await setPolicy(db, tenantId, k, raw, "owner");
+    if (r.ok) changed++; else if (r.reason === "invalid") bad++;
+  }
+  revalidatePath("/owner/settings");
+  redirect(`/owner/settings?m=saved&n=${changed}&bad=${bad}`);
+}
+
+/** Пауза между клиентами 30 минут для всех услуг (по ТЗ v2.0) */
+export async function setBufferAll(fd: FormData) {
+  const { tenantId, db } = await guard();
+  const min = Math.max(0, Math.min(120, Math.trunc(Number(fd.get("min") ?? 30)) || 0));
+  await db.run("UPDATE services SET buffer_min=?2 WHERE tenant_id=?1", [tenantId, min]);
+  await audit(db, tenantId, "owner", "services.buffer_all", String(min));
+  revalidatePath("/owner/settings");
+  redirect(`/owner/settings?m=buffer&n=${min}`);
+}

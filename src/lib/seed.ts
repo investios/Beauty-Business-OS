@@ -12,7 +12,7 @@ const SERVICES: { slug: string; title: L3; desc: L3; duration: number; buffer: n
       ru: "Обсуждаем вашу цель и дальнейшие шаги. Итоговое предложение зависит от индивидуального осмотра.",
       uk: "Обговорюємо вашу мету та подальші кроки. Остаточна пропозиція залежить від індивідуального огляду.",
     },
-    duration: 45, buffer: 15,
+    duration: 45, buffer: 30,
   },
   {
     slug: "hair-extensions",
@@ -22,7 +22,7 @@ const SERVICES: { slug: string; title: L3; desc: L3; duration: number; buffer: n
       ru: "Методы, длительность и стоимость уточняются индивидуально после консультации.",
       uk: "Методи, тривалість і вартість уточнюються індивідуально після консультації.",
     },
-    duration: 120, buffer: 15,
+    duration: 120, buffer: 30,
   },
   {
     slug: "signature-technique",
@@ -32,7 +32,7 @@ const SERVICES: { slug: string; title: L3; desc: L3; duration: number; buffer: n
       ru: "Название, протокол и допустимые формулировки будут добавлены после того, как их передаст мастер.",
       uk: "Назва, протокол і допустимі формулювання будуть додані після того, як їх надасть майстер.",
     },
-    duration: 90, buffer: 15,
+    duration: 90, buffer: 30,
   },
 ];
 

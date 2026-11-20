@@ -108,9 +108,9 @@ describe("holds", () => {
 
 describe("cancel / reschedule / guest access", () => {
   it("cancel frees the slot and cancels queued reminders", async () => {
-    const s = (await slots(c))[0];
+    const s = (await slots(c)).find((x) => new Date(x.startUtc).getTime() > NOW.getTime() + 48 * 3600000)!;
     const r = await book(c, s.startUtc);
-    await cancelBooking(c.db, c.tenantId, r.appointmentId, r.manageToken);
+    await cancelBooking(c.db, c.tenantId, r.appointmentId, r.manageToken, NOW);
     expect((await slots(c)).some((x) => x.startUtc === s.startUtc)).toBe(true);
     const q = await rows(c.db, "SELECT status FROM notifications WHERE appointment_id=?1 AND kind='reminder_24h'", [r.appointmentId]);
     expect(q.every((x: any) => x.status === "cancelled")).toBe(true);

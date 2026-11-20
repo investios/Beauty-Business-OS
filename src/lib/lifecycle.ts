@@ -6,7 +6,11 @@ import { formatLocal, localParts, zonedToUtc, addLocalDays } from "./tz";
 
 /** Сообщения жизненного цикла. По умолчанию ПРОБНЫЙ режим: тексты формируются и сохраняются, наружу ничего не уходит.
  *  Реальная отправка включается только флагом LIFECYCLE_SEND=1 и настроенным провайдером почты. */
-export const LIFECYCLE_KINDS: MsgKind[] = ["reminder_24h", "followup", "rebook"];
+import { REMINDER_KINDS } from "./reminders";
+import { getPolicies } from "./policies";
+export const LIFECYCLE_KINDS: MsgKind[] = [...REMINDER_KINDS, "followup", "rebook"];
+const KINDS_SQL = LIFECYCLE_KINDS.map((k) => `'${k}'`).join(",");
+const isReminder = (k: string) => (REMINDER_KINDS as string[]).includes(k);
 export const FOLLOWUP_AFTER_H = 24;
 export const REBOOK_AFTER_DAYS = 28;
 export const QUIET_FROM_H = 20, QUIET_TO_H = 9; // тихие часы по Дублину: с 20:00 до 09:00 не отправляем
@@ -30,14 +34,15 @@ async function tableReady(db: Db) { try { await rows(db, "SELECT 1 FROM lifecycl
 /** Создаёт недостающие задачи «как прошёл визит» и «повторный визит» и снимает задачи по неактивным записям. Повторный вызов ничего не дублирует. */
 export async function planLifecycle(db: Db, tenantId: string, o: RunOpts): Promise<number> {
   const now = new Date(o.nowMs).toISOString();
-  await db.run(`UPDATE notifications SET status='cancelled' WHERE tenant_id=?1 AND status='queued' AND kind IN ('reminder_24h','followup','rebook')
+  await db.run(`UPDATE notifications SET status='cancelled' WHERE tenant_id=?1 AND status='queued' AND kind IN (${KINDS_SQL})
     AND appointment_id IN (SELECT id FROM appointments WHERE tenant_id=?1 AND status IN ('cancelled','no_show','held'))`, [tenantId]);
   const done = o.assumeVisits ? "('completed','confirmed')" : "('completed')";
   const appts = await rows<{ id: string; end_at: string }>(db, `SELECT id,end_at FROM appointments WHERE tenant_id=?1 AND client_id IS NOT NULL AND status IN ${done} AND end_at <= ?2 AND end_at > ?3`,
     [tenantId, o.assumeVisits ? new Date(o.nowMs + 40 * 86400000).toISOString() : now, new Date(o.nowMs - 90 * 86400000).toISOString()]);
   let n = 0;
+  const pol = (await getPolicies(db, tenantId)).values;
   for (const a of appts) {
-    for (const [kind, due] of [["followup", startMs(a.end_at) + FOLLOWUP_AFTER_H * 3600000], ["rebook", startMs(a.end_at) + REBOOK_AFTER_DAYS * 86400000]] as const) {
+    for (const [kind, due] of [["followup", startMs(a.end_at) + pol.followup_after_hours * 3600000], ["rebook", startMs(a.end_at) + pol.rebook_after_days * 86400000]] as const) {
       const r = await db.run(`INSERT INTO notifications(id,tenant_id,appointment_id,kind,status,scheduled_for,created_at)
         SELECT ?1,?2,?3,?4,'queued',?5,?6 WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE appointment_id=?3 AND kind=?4 AND status<>'cancelled')`,
         [uuid(), tenantId, a.id, kind, new Date(toSendWindow(due)).toISOString(), now]);
@@ -53,7 +58,7 @@ export async function runLifecycle(db: Db, tenantId: string, o: RunOpts): Promis
   const res: RunResult = { planned: 0, simulated: 0, sent: 0, failed: 0, skipped: 0, waiting: 0, ready: true };
   if (!(await tableReady(db))) return { ...res, ready: false };
   res.planned = await planLifecycle(db, tenantId, o);
-  const jobs = await rows<Job>(db, "SELECT id,kind,appointment_id,scheduled_for FROM notifications WHERE tenant_id=?1 AND status='queued' AND kind IN ('reminder_24h','followup','rebook') AND scheduled_for <= ?2 ORDER BY scheduled_for LIMIT 200", [tenantId, new Date(o.nowMs).toISOString()]);
+  const jobs = await rows<Job>(db, `SELECT id,kind,appointment_id,scheduled_for FROM notifications WHERE tenant_id=?1 AND status='queued' AND kind IN (${KINDS_SQL}) AND scheduled_for <= ?2 ORDER BY scheduled_for LIMIT 200`, [tenantId, new Date(o.nowMs).toISOString()]);
   for (const j of jobs) {
     const c = await one<{ status: string; start_at: string; manage_token: string; appt_locale: string; name: string; contact: string; preferred_locale: string; client_id: string; title_i18n: Record<string, string>; salon: string }>(db,
       `SELECT a.status,a.start_at,a.manage_token,a.locale appt_locale,c.name,c.contact,c.preferred_locale,c.id client_id,s.title_i18n,t.name salon
@@ -67,9 +72,9 @@ export async function runLifecycle(db: Db, tenantId: string, o: RunOpts): Promis
     };
     if (!c) { await finish("cancelled", "skipped", { reason: "appointment_missing" }); continue; }
     const visitDone = c.status === "completed" || (o.assumeVisits && c.status === "confirmed");
-    const okStatus = j.kind === "reminder_24h" ? c.status === "confirmed" || c.status === "requested" : visitDone;
+    const okStatus = isReminder(j.kind) ? c.status === "confirmed" || c.status === "requested" : visitDone;
     if (!okStatus) { await finish("cancelled", "skipped", { reason: "appointment_not_active" }); continue; }
-    if (j.kind === "reminder_24h" && startMs(c.start_at) <= o.nowMs) { await finish("cancelled", "skipped", { reason: "visit_already_started" }); continue; }
+    if (isReminder(j.kind) && startMs(c.start_at) <= o.nowMs) { await finish("cancelled", "skipped", { reason: "visit_already_started" }); continue; }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.contact)) { await finish("cancelled", "skipped", { reason: "contact_not_email" }); continue; }
     const cons = async (p: "service" | "marketing") => !!(await one(db, "SELECT 1 FROM consents WHERE client_id=?1 AND tenant_id=?2 AND purpose=?3 AND withdrawn_at IS NULL LIMIT 1", [c.client_id, tenantId, p]));
     if (!(await cons("service"))) { await finish("cancelled", "skipped", { reason: "no_service_consent" }); continue; }

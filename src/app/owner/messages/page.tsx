@@ -1,12 +1,12 @@
 import OwnerShell from "@/components/OwnerShell";
 import { getDb, rows } from "@/lib/db";
 import { KIND_LABEL, IS_MARKETING, PREVIEW_LINK, render, type MsgKind } from "@/lib/lifecycle-templates";
-import { FOLLOWUP_AFTER_H, QUIET_FROM_H, QUIET_TO_H, REBOOK_AFTER_DAYS } from "@/lib/lifecycle";
+import { QUIET_FROM_H, QUIET_TO_H } from "@/lib/lifecycle";
 import { localParts } from "@/lib/tz";
 import { resetLifecycleSimulation, runLifecycleSimulation } from "../actions";
 export const dynamic = "force-dynamic";
 
-const KINDS: MsgKind[] = ["booking_confirmation", "reminder_24h", "followup", "rebook"];
+const KINDS: MsgKind[] = ["booking_confirmation", "reminder_24h", "reminder_2d", "reminder_morning", "reminder_1h", "followup", "rebook"];
 const REASON: Record<string, string> = {
   appointment_not_active: "запись отменена или не подтверждена", appointment_missing: "запись не найдена", visit_already_started: "визит уже начался",
   contact_not_email: "у клиента не e-mail (только телефон)", no_service_consent: "нет согласия на обработку данных для записи", no_marketing_consent: "нет согласия на рекламные сообщения",
@@ -29,7 +29,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
         try { await rows(db, "SELECT 1 FROM lifecycle_messages LIMIT 1"); } catch { ready = false; }
         const queue = await rows<{ id: string; kind: string; scheduled_for: string; name: string }>(db,
           `SELECT n.id,n.kind,n.scheduled_for,c.name FROM notifications n JOIN appointments a ON a.id=n.appointment_id JOIN clients c ON c.id=a.client_id
-           WHERE n.tenant_id=?1 AND n.status='queued' AND n.kind IN ('reminder_24h','followup','rebook') ORDER BY n.scheduled_for LIMIT 40`, [t.id]);
+           WHERE n.tenant_id=?1 AND n.status='queued' AND n.kind IN ('reminder_24h','reminder_2d','reminder_morning','reminder_1h','followup','rebook') ORDER BY n.scheduled_for LIMIT 40`, [t.id]);
         const log = ready ? await rows<{ id: string; kind: string; status: string; mode: string; subject: string | null; body: string | null; skip_reason: string | null; locale: string; processed_at: string; name: string; error: string | null }>(db,
           `SELECT n.id,n.kind,n.status,n.error,m.mode,m.subject,m.body,m.skip_reason,m.locale,m.processed_at,c.name
            FROM lifecycle_messages m JOIN notifications n ON n.id=m.notification_id JOIN appointments a ON a.id=n.appointment_id JOIN clients c ON c.id=a.client_id
@@ -52,9 +52,9 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
             <h2>Что и когда отправляется</h2>
             <ul className="plain">
               <li><b>Подтверждение записи</b>: сразу после записи.</li>
-              <li><b>Напоминание за сутки</b>: за 24 часа до визита; снимается, если запись отменена или перенесена (после переноса ставится заново).</li>
-              <li><b>Как прошёл визит</b>: через {FOLLOWUP_AFTER_H} часа после визита, когда вы отметили его «состоялась».</li>
-              <li><b>Приглашение на повторный визит</b>: через {REBOOK_AFTER_DAYS} дней, только клиентам с согласием на рекламные сообщения; в письме есть «ответьте стоп».</li>
+              <li><b>Напоминания о визите</b>: вечером накануне в 19:00, за 2 дня при ранней записи, утром и за час (последние два по умолчанию выключены). Включаются в <a href="/owner/settings">Настройках</a>; при отмене или переносе записи снимаются и ставятся заново.</li>
+              <li><b>Как прошёл визит</b>: через заданное в Настройках время после визита, когда вы отметили его «состоялась».</li>
+              <li><b>Приглашение на повторный визит</b>: через заданное в Настройках число дней, только клиентам с согласием на рекламные сообщения; в письме есть «ответьте стоп».</li>
               <li><b>Тихие часы</b>: с {QUIET_FROM_H}:00 до {QUIET_TO_H}:00 по Дублину письма не уходят, ждут утра.</li>
               <li><b>Согласия</b>: без согласия на обработку данных для записи или при отзыве рекламного согласия письмо пропускается, причина видна ниже.</li>
             </ul>

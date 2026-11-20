@@ -100,17 +100,17 @@ describe("пробный прогон", () => {
     const morning = await runLifecycle(c.db, c.tenantId, { nowMs: late.utcMs + 12 * 3600000 });
     expect(morning.simulated).toBeGreaterThanOrEqual(1);
   });
-  it("напоминание за сутки: формируется вовремя; после начала визита пропускается; отмена записи его снимает", async () => {
+  it("напоминание вечером накануне: формируется вовремя; после начала визита пропускается; отмена записи его снимает", async () => {
     const c = await setup();
     const s = (await getAvailability(c.db, { tenantId: c.tenantId, serviceId: c.consult.id, now: NOW, days: 6 })).find((x) => x.startUtc.startsWith("2026-11-12"))!;
     const mk = async (i: number) => createBooking(c.db, { tenantId: c.tenantId, serviceId: c.consult.id, startsAtUtc: s.startUtc, client: person(i), idempotencyKey: key(), consentService: true, now: NOW });
     const r = await mk(1);
-    const due = utc(s.startUtc) - 24 * 3600000;
+    const due = utc("2026-11-11T19:00:00Z"); // вечером накануне, 19:00 по Дублину (ноябрь: UTC)
     const ok = await runLifecycle(c.db, c.tenantId, { nowMs: Math.max(due + 60000, utc("2026-11-11T10:00:00Z")) });
     expect(ok.simulated + ok.waiting).toBeGreaterThanOrEqual(1);
-    const c2 = await setup(); const s2 = (await getAvailability(c2.db, { tenantId: c2.tenantId, serviceId: c2.consult.id, now: NOW, days: 6 }))[0];
+    const c2 = await setup(); const s2 = (await getAvailability(c2.db, { tenantId: c2.tenantId, serviceId: c2.consult.id, now: NOW, days: 6 })).find((x) => new Date(x.startUtc).getTime() > NOW.getTime() + 36 * 3600000)!;
     const r2 = await createBooking(c2.db, { tenantId: c2.tenantId, serviceId: c2.consult.id, startsAtUtc: s2.startUtc, client: person(2), idempotencyKey: key(), consentService: true, now: NOW });
-    await cancelBooking(c2.db, c2.tenantId, r2.appointmentId, r2.manageToken);
+    await cancelBooking(c2.db, c2.tenantId, r2.appointmentId, r2.manageToken, NOW);
     const out = await runLifecycle(c2.db, c2.tenantId, { nowMs: utc(s2.startUtc) });
     expect(out.simulated).toBe(0);
     expect(r.status).toBeDefined();

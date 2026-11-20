@@ -1,10 +1,12 @@
 import { auditStmt, isOverlap, isUnique, js, nowIso, one, rows, uuid, type Db, type Param } from "./db";
 import { getServiceRules } from "./service-rules";
+import { getPolicies, type Policies } from "./policies";
+import { planReminders } from "./reminders";
 import { addLocalDays, DEFAULT_TZ, formatLocal, localParts, weekdayOfLocalDate, zonedToUtc } from "./tz";
 
 
 export class BookingError extends Error {
-  constructor(public code: "slot_taken" | "slot_unavailable" | "not_found" | "invalid" | "forbidden", message: string, public alternatives: Slot[] = []) {
+  constructor(public code: "slot_taken" | "slot_unavailable" | "not_found" | "invalid" | "forbidden" | "too_late", message: string, public alternatives: Slot[] = []) {
     super(message);
   }
 }
@@ -140,13 +142,17 @@ function shape(r: ApptRow, tz: string, replayed: boolean): BookingResult {
 }
 
 type Stmt = { sql: string; params: Param[] };
-const reminderStmts = (tenantId: string, apptId: string, start: Date, now: Date): Stmt[] => {
+const reminderRows = (tenantId: string, apptId: string, start: Date, now: Date, pol: Policies): Stmt[] =>
+  planReminders(start, now, pol).map((r) => ({ sql: "INSERT INTO notifications(id,tenant_id,appointment_id,kind,status,scheduled_for,created_at) VALUES (?1,?2,?3,?4,'queued',?5,?6)", params: [uuid(), tenantId, apptId, r.kind, r.at.toISOString(), now.toISOString()] }));
+/** Условия записи (лимит отмены) фиксируются на момент создания; пишем, только если миграция 0009 уже применена */
+const termsStmt = (apptId: string, pol: { values: Policies; persisted: boolean }, now: Date): Stmt[] =>
+  pol.persisted ? [{ sql: "INSERT OR IGNORE INTO appointment_terms(appointment_id,cancel_limit_hours,created_at) VALUES (?1,?2,?3)", params: [apptId, pol.values.cancel_limit_hours, now.toISOString()] }] : [];
+const reminderStmts = (tenantId: string, apptId: string, start: Date, now: Date, pol: { values: Policies; persisted: boolean }): Stmt[] => [
   // Подтверждение и напоминание — только записи в очередь; реальная отправка отдельно и честно помечается.
-  const out: Stmt[] = [{ sql: "INSERT INTO notifications(id,tenant_id,appointment_id,kind,status,scheduled_for,created_at) VALUES (?1,?2,?3,'booking_confirmation','not_configured',?4,?4)", params: [uuid(), tenantId, apptId, now.toISOString()] }];
-  const at = new Date(start.getTime() - 24 * 3600000);
-  if (at > now) out.push({ sql: "INSERT INTO notifications(id,tenant_id,appointment_id,kind,status,scheduled_for,created_at) VALUES (?1,?2,?3,'reminder_24h','queued',?4,?5)", params: [uuid(), tenantId, apptId, at.toISOString(), now.toISOString()] });
-  return out;
-};
+  { sql: "INSERT INTO notifications(id,tenant_id,appointment_id,kind,status,scheduled_for,created_at) VALUES (?1,?2,?3,'booking_confirmation','not_configured',?4,?4)", params: [uuid(), tenantId, apptId, now.toISOString()] },
+  ...reminderRows(tenantId, apptId, start, now, pol.values),
+  ...termsStmt(apptId, pol, now),
+];
 
 export async function createBooking(db: Db, input: BookingInput): Promise<BookingResult> {
   if (!input.idempotencyKey || input.idempotencyKey.length < 8) throw new BookingError("invalid", "idempotencyKey required");
@@ -196,7 +202,7 @@ export async function createBooking(db: Db, input: BookingInput): Promise<Bookin
     sql: `INSERT INTO consents(id,tenant_id,client_id,purpose,channel,policy_version,granted_at) VALUES (?3,?1,${clientSel},?4,'website','2026-11-draft',?5)`,
     params: [input.tenantId, norm, uuid(), purpose, now.toISOString()],
   });
-  const tail: Stmt[] = [consent("service"), ...(input.consentMarketing ? [consent("marketing")] : []), ...reminderStmts(input.tenantId, apptId, start, now), auditStmt(input.tenantId, "guest", "booking.create", apptId) as Stmt];
+  const tail: Stmt[] = [consent("service"), ...(input.consentMarketing ? [consent("marketing")] : []), ...reminderStmts(input.tenantId, apptId, start, now, await getPolicies(db, input.tenantId)), auditStmt(input.tenantId, "guest", "booking.create", apptId) as Stmt];
 
   try {
     if (hold) {
@@ -234,10 +240,18 @@ export async function getBookingByToken(db: Db, tenantId: string, id: string, to
   return one<{ id: string; status: string; start_at: string; end_at: string; service_id: string }>(db, "SELECT id,status,start_at,end_at,service_id FROM appointments WHERE id=?1 AND tenant_id=?2 AND manage_token=?3", [id, tenantId, tokenStr]);
 }
 
-export async function cancelBooking(db: Db, tenantId: string, id: string, tokenStr: string) {
+/** Лимит отмены для записи: условия на момент её создания, иначе текущее правило. Клиент не отменяет и не переносит сам ближе этого срока. */
+async function assertWithinCancelLimit(db: Db, tenantId: string, apptId: string, startIso: string, now: Date) {
+  const terms = await one<{ cancel_limit_hours: number }>(db, "SELECT cancel_limit_hours FROM appointment_terms WHERE appointment_id=?1", [apptId]).catch(() => null);
+  const limit = terms ? terms.cancel_limit_hours : (await getPolicies(db, tenantId)).values.cancel_limit_hours;
+  if (new Date(startIso).getTime() - now.getTime() < limit * 3600000) throw new BookingError("too_late", `Changes are possible no later than ${limit} h before the visit`);
+}
+
+export async function cancelBooking(db: Db, tenantId: string, id: string, tokenStr: string, now = new Date()) {
   const a = await getBookingByToken(db, tenantId, id, tokenStr);
   if (!a) throw new BookingError("not_found", "booking not found");
   if (a.status === "cancelled") return { status: "cancelled" };
+  await assertWithinCancelLimit(db, tenantId, id, a.start_at, now);
   await db.batch([
     { sql: "UPDATE appointments SET status='cancelled', version=version+1 WHERE id=?1 AND tenant_id=?2", params: [id, tenantId] },
     { sql: "UPDATE notifications SET status='cancelled' WHERE appointment_id=?1 AND status='queued'", params: [id] },
@@ -248,8 +262,10 @@ export async function cancelBooking(db: Db, tenantId: string, id: string, tokenS
 
 export async function rescheduleBooking(db: Db, p: { tenantId: string; id: string; token: string; newStartUtc: string; now?: Date }) {
   const now = p.now ?? new Date();
-  const a = await one<{ id: string; status: string; service_id: string; staff_id: string }>(db, "SELECT id,status,service_id,staff_id FROM appointments WHERE id=?1 AND tenant_id=?2 AND manage_token=?3", [p.id, p.tenantId, p.token]);
+  const a = await one<{ id: string; status: string; service_id: string; staff_id: string; start_at: string }>(db, "SELECT id,status,service_id,staff_id,start_at FROM appointments WHERE id=?1 AND tenant_id=?2 AND manage_token=?3", [p.id, p.tenantId, p.token]);
   if (!a || a.status !== "confirmed") throw new BookingError("not_found", "booking not found");
+  await assertWithinCancelLimit(db, p.tenantId, a.id, a.start_at, now);
+  const pol = await getPolicies(db, p.tenantId);
   const start = new Date(p.newStartUtc);
   // своё текущее окно считаем свободным, чужие занятые — нет
   const avail = await getAvailability(db, { tenantId: p.tenantId, serviceId: a.service_id, from: new Date(start.getTime() - 86400000), days: 3, now, staffId: a.staff_id, excludeAppointmentId: a.id });
@@ -262,7 +278,7 @@ export async function rescheduleBooking(db: Db, p: { tenantId: string; id: strin
       { sql: "UPDATE appointments SET start_at=?1,end_at=?2,blocked_until=?3,version=version+1 WHERE id=?4 AND tenant_id=?5 AND status='confirmed'", params: [start.toISOString(), end.toISOString(), blocked.toISOString(), a.id, p.tenantId] },
       // Старые напоминания гасим, новое создаём ровно одно — дублей нет
       { sql: "UPDATE notifications SET status='cancelled' WHERE appointment_id=?1 AND status='queued'", params: [a.id] },
-      ...(new Date(start.getTime() - 24 * 3600000) > now ? [{ sql: "INSERT INTO notifications(id,tenant_id,appointment_id,kind,status,scheduled_for,created_at) VALUES (?1,?2,?3,'reminder_24h','queued',?4,?5)", params: [uuid(), p.tenantId, a.id, new Date(start.getTime() - 24 * 3600000).toISOString(), now.toISOString()] as Param[] }] : []),
+      ...reminderRows(p.tenantId, a.id, start, now, pol.values),
       auditStmt(p.tenantId, "guest", "booking.reschedule", a.id) as Stmt,
     ]);
   } catch (e) {
@@ -319,6 +335,7 @@ export async function ownerRescheduleBooking(db: Db, p: { tenantId: string; id: 
   const now = p.now ?? new Date();
   const a = await one<{ id: string; status: string; service_id: string }>(db, "SELECT id,status,service_id FROM appointments WHERE id=?1 AND tenant_id=?2", [p.id, p.tenantId]);
   if (!a || !["confirmed", "requested"].includes(a.status)) throw new BookingError("not_found", "booking not found");
+  const pol = await getPolicies(db, p.tenantId);
   const start = new Date(p.newStartUtc);
   if (isNaN(start.getTime())) throw new BookingError("invalid", "bad start");
   const svc = (await one<{ duration_min: number; buffer_min: number }>(db, "SELECT duration_min,buffer_min FROM services WHERE id=?1", [a.service_id]))!;
@@ -328,7 +345,7 @@ export async function ownerRescheduleBooking(db: Db, p: { tenantId: string; id: 
     await db.batch([
       { sql: "UPDATE appointments SET start_at=?1,end_at=?2,blocked_until=?3,version=version+1 WHERE id=?4 AND tenant_id=?5 AND status IN ('confirmed','requested')", params: [start.toISOString(), end.toISOString(), blocked.toISOString(), a.id, p.tenantId] },
       { sql: "UPDATE notifications SET status='cancelled' WHERE appointment_id=?1 AND status='queued'", params: [a.id] },
-      ...(new Date(start.getTime() - 24 * 3600000) > now ? [{ sql: "INSERT INTO notifications(id,tenant_id,appointment_id,kind,status,scheduled_for,created_at) VALUES (?1,?2,?3,'reminder_24h','queued',?4,?5)", params: [uuid(), p.tenantId, a.id, new Date(start.getTime() - 24 * 3600000).toISOString(), now.toISOString()] }] : []),
+      ...reminderRows(p.tenantId, a.id, start, now, pol.values),
       auditStmt(p.tenantId, "owner", "booking.reschedule", a.id) as Stmt,
     ]);
   } catch (e) {

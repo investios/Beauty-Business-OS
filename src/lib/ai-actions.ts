@@ -33,6 +33,7 @@ const X = {
   declined: { en: "Okay, nothing was changed.", ru: "Хорошо, ничего не менял.", uk: "Добре, нічого не змінював." },
   expired: { en: "This request has expired, so nothing was changed. Please ask again.", ru: "Время на подтверждение вышло, ничего не изменено. Попросите ещё раз.", uk: "Час на підтвердження минув, нічого не змінено. Попросіть ще раз." },
   taken: { en: "That time was just taken, nothing was changed. Please choose another.", ru: "Это время только что заняли, ничего не изменено. Выберите другое.", uk: "Цей час щойно зайняли, нічого не змінено. Оберіть інший." },
+  tooLate: { en: "The visit is too close to change it online (changes are possible no later than the set limit before the visit), so I have passed your request to the specialist. She will reply to you.", ru: "До визита слишком мало времени, чтобы изменить запись онлайн (изменения возможны не позже установленного срока), поэтому я передал вашу просьбу мастеру. Она ответит вам.", uk: "До візиту замало часу, щоб змінити запис онлайн (зміни можливі не пізніше встановленого терміну), тому я передав ваше прохання майстру. Вона відповість вам." },
   failed: { en: "I couldn't complete that, nothing was changed. I can pass it to the specialist.", ru: "Не получилось выполнить, ничего не изменено. Могу передать мастеру.", uk: "Не вдалося виконати, нічого не змінено. Можу передати майстру." },
 };
 export const actionText = (k: keyof typeof X, l: Loc) => X[k][l];
@@ -118,7 +119,7 @@ export async function confirmAction(db: Db, p: { tenantId: string; conversationI
   if (claim.changes !== 1) return { ok: false, message: actionText("failed", l) };
   try {
     let msg: string;
-    if (a.kind === "cancel") { await cancelBooking(db, p.tenantId, a.booking_id, a.secret); msg = actionText("doneCancel", l); }
+    if (a.kind === "cancel") { await cancelBooking(db, p.tenantId, a.booking_id, a.secret, now); msg = actionText("doneCancel", l); }
     else if (a.kind === "reschedule" && a.new_start_utc) {
       await rescheduleBooking(db, { tenantId: p.tenantId, id: a.booking_id, token: a.secret, newStartUtc: a.new_start_utc, now });
       msg = `${actionText("doneMove", l)} ${formatLocal(new Date(a.new_start_utc).getTime(), l)}.`;
@@ -131,6 +132,12 @@ export async function confirmAction(db: Db, p: { tenantId: string; conversationI
   } catch (e) {
     const code = e instanceof BookingError ? e.code : "error";
     await db.run("UPDATE ai_pending_actions SET status='failed', error=?2, secret='' WHERE id=?1", [a.id, code]);
+    if (code === "too_late") {
+      // Слишком близко к визиту: запись не меняем, вопрос уходит мастеру
+      const open = await one<{ id: string }>(db, "SELECT id FROM handoffs WHERE conversation_id=?1 AND status='open' LIMIT 1", [a.conversation_id]);
+      if (!open) await db.run("INSERT INTO handoffs(id,tenant_id,conversation_id,reason,summary,created_at) VALUES (?1,?2,?3,'late_change',?4,?5)", [uuid(), p.tenantId, a.conversation_id, `Клиент просит ${a.kind === "cancel" ? "отменить" : "перенести"} запись ближе лимита отмены`, nowIso()]);
+      return { ok: false, message: actionText("tooLate", l) };
+    }
     return { ok: false, message: code === "slot_taken" || code === "slot_unavailable" ? actionText("taken", l) : actionText("failed", l) };
   }
 }
