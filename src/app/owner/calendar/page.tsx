@@ -4,6 +4,8 @@ import { getAvailability } from "@/lib/booking";
 import { STATUS } from "@/lib/owner-ui";
 import { addLocalDays, localParts, zonedToUtc } from "@/lib/tz";
 import { apptsInRange, isView, parseYmd, shiftAnchor, sickLeavePreview, todayYmd, viewRange, ymdKey, type CalAppt, type View } from "@/lib/calendar";
+import VoiceField from "@/components/VoiceField";
+import SpeakButton from "@/components/SpeakButton";
 import { ABSENCE_DRAFT, parseAbsence } from "@/lib/owner-assistant";
 import { addWaitlist, setWaitlistStatus } from "../actions";
 export const dynamic = "force-dynamic";
@@ -150,11 +152,11 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
             <p className="hint" style={{ marginTop: 0 }}>Выберите дни, когда вас не будет, и посмотрите, какие записи попадают в этот период. Это только просмотр: записи не меняются, клиентам ничего не отправляется.</p>
             <form method="get" action="/owner/calendar#sick" className="sched-set">
               <input type="hidden" name="view" value={view} />
-              <label className="field"><span>Или скажите помощнику своими словами</span><input type="text" name="q" defaultValue={sp.q ?? ""} maxLength={300} placeholder="Например: я заболела с 15 по 17 декабря" autoComplete="off" /></label>
+              <VoiceField name="q" label="Или скажите помощнику своими словами" placeholder="Например: я заболела с 15 по 17 декабря" defaultValue={sp.q ?? ""} />
               <div className="row"><button className="btn btn-primary" type="submit">Понять и показать</button></div>
             </form>
             {said && (said.ok
-              ? <p role="status">Поняла так: <b>{said.understood}</b>. Если это не то, поправьте фразу или выберите даты ниже.</p>
+              ? <p role="status">Поняла так: <b>{said.understood}</b>. Если это не то, поправьте фразу или выберите даты ниже. <SpeakButton text={`Поняла так: ${said.understood}`} /></p>
               : <p className="msg-error" role="status">{said.ask}</p>)}
             <form method="get" action="/owner/calendar#sick" className="sched-set">
               <input type="hidden" name="view" value={view} />
