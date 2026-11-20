@@ -1,4 +1,5 @@
 import { getPolicies } from "./policies";
+import { addToWaitlist } from "./waitlist";
 import { audit, js, nowIso, one, rows, uuid, type Db } from "./db";
 import { getAvailability, listServices } from "./booking";
 import { formatLocal } from "./tz";
@@ -22,7 +23,8 @@ export type AiReply = {
 };
 
 /* ---------- язык ---------- */
-export function detectLocale(text: string, fallback: Locale): Locale {
+export function detectLocale(textRaw: string, fallback: Locale): Locale {
+  const text = textRaw.replace(/[^\s@]+@[^\s@]+\.[^\s@]{2,}/g, " ").replace(/https?:\/\/\S+/g, " "); // адрес почты и ссылка не определяют язык
   if (/[іїєґІЇЄҐ]/.test(text)) return "uk";
   if (/[а-яё]/i.test(text)) {
     if (/[ыэъё]/i.test(text)) return "ru";
@@ -75,7 +77,8 @@ const T = {
   slotsIntro: { en: "Here are the nearest free times:", ru: "Вот ближайшее свободное время:", uk: "Ось найближчий вільний час:" },
   slotsNoMatch: { en: "I have nothing free at exactly that time.", ru: "На это время свободного места нет.", uk: "На цей час вільного місця немає." },
   slotsPick: { en: "Choose a time and I'll take you to the booking step.", ru: "Выберите время, и я перейду к оформлению записи.", uk: "Оберіть час, і я перейду до оформлення запису." },
-  noSlots: { en: "I can't see free times for that request right now. I can pass this to the specialist so they can suggest a time — please leave a phone number or email.", ru: "Сейчас я не вижу свободного времени по этому запросу. Могу передать мастеру, чтобы он предложил время: оставьте телефон или почту.", uk: "Зараз я не бачу вільного часу за цим запитом. Можу передати майстру, щоб він запропонував час: залиште телефон або пошту." },
+  noSlots: { en: "I can't see free times for that request right now. Leave a phone number or email and I'll put you on the waiting list and pass this to the specialist: you will be contacted if a time opens up.", ru: "Сейчас я не вижу свободного времени по этому запросу. Оставьте телефон или почту: я внесу вас в лист ожидания и передам мастеру, с вами свяжутся, если время освободится.", uk: "Зараз я не бачу вільного часу за цим запитом. Залиште телефон або пошту: я внесу вас до листа очікування й передам майстру, з вами зв'яжуться, якщо час звільниться." },
+  waitAdded: { en: "You are on the waiting list.", ru: "Вы в листе ожидания.", uk: "Ви в листі очікування." },
   consultQ: { en: "Would you like to see free times for a consultation?", ru: "Показать свободное время для консультации?", uk: "Показати вільний час для консультації?" },
   medical: {
     en: "I'm an AI assistant and can't assess symptoms or give medical advice. I've passed your message to the specialist. If you feel unwell or it's urgent, please contact a medical professional. Please leave a phone number or email so the specialist can reach you.",
@@ -190,13 +193,19 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
     requiresHuman = true;
     parts.push(primary === "medical" ? T.medical[locale] : primary === "human" ? T.human[locale] : T.unknown[locale]);
   } else if (primary === "contact") {
-    const open = await one<{ id: string }>(db, "SELECT id FROM handoffs WHERE conversation_id=?1 AND status='open' AND contact IS NULL ORDER BY rowid DESC LIMIT 1", [conv.id]);
+    const open = await one<{ id: string; reason: string }>(db, "SELECT id,reason FROM handoffs WHERE conversation_id=?1 AND status='open' AND contact IS NULL ORDER BY rowid DESC LIMIT 1", [conv.id]);
     const contact = text.match(CONTACT_RE)?.[0];
     if (open && contact) {
       await db.run("UPDATE handoffs SET contact=?1 WHERE id=?2", [contact, open.id]);
       tools.push({ tool: "requestHandoff", ok: true, detail: "contact attached" });
       requiresHuman = true; handoffId = open.id;
       parts.push(T.contactSaved[locale]);
+      if (open.reason === "no_slots") {
+        const svc = (await listServices(db, p.tenantId)).find((x) => x.slug === "consultation");
+        const w = await addToWaitlist(db, p.tenantId, { contact, serviceId: svc?.id, note: "из диалога с ИИ", now: p.now });
+        tools.push({ tool: "addToWaitlist", ok: w === "added" || w === "exists", detail: w });
+        if (w === "added" || w === "exists") parts.push(T.waitAdded[locale]);
+      }
     } else parts.push(T.contactNoCase[locale]);
   } else if (primary === "greeting") {
     parts.push(T.greeting[locale]);

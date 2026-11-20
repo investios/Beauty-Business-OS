@@ -35,6 +35,7 @@ export default async function AiPage({ searchParams }: { searchParams: Promise<{
                 {h.status === "open" && <form action={resolveHandoff}><input type="hidden" name="id" value={h.id} /><button className="btn btn-secondary btn-sm" type="submit">Отметить как решённый</button></form>}
               </div>))}</div>
           </section>
+          <p className="hint">Клиенты, которым ИИ не нашёл времени и которые оставили контакт, попадают в <a href="/owner/calendar#waitlist">лист ожидания в Календаре</a>.</p>
           <section><h2>Что знает ИИ</h2>
             <p className="warnbox" style={{ marginBottom: 12 }}>ИИ отвечает только по опубликованной версии. Сейчас тексты — нейтральные заглушки, мастер их ещё не утвердил. Правка попадает к клиентам только после «Утвердить» и «Опубликовать версию»{drafts ? ` (черновиков: ${drafts})` : ""}.</p>
             <div className="list">{keys.map((k) => (
