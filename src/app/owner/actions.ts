@@ -276,3 +276,38 @@ export async function setBufferAll(fd: FormData) {
   revalidatePath("/owner/settings");
   redirect(`/owner/settings?m=buffer&n=${min}`);
 }
+
+/** Карточка клиента: статус, канал, заметки, жалобы, отзывы */
+async function clientAction(fd: FormData, fn: (g: { db: Awaited<ReturnType<typeof getDb>>; tenantId: string }, clientId: string) => Promise<boolean>, okKey: string) {
+  const g = await guard();
+  const clientId = String(fd.get("client"));
+  if (!/^[0-9a-f-]{36}$/.test(clientId)) throw new Error("bad id");
+  let ok = false, missing = false;
+  try { ok = await fn(g, clientId); } catch { missing = true; }
+  revalidatePath(`/owner/clients/${clientId}`);
+  redirect(`/owner/clients/${clientId}?m=${missing ? "migration" : ok ? okKey : "bad"}`);
+}
+export async function saveClientStatus(fd: FormData) {
+  const { setClientStatus } = await import("@/lib/client-model");
+  await clientAction(fd, ({ db, tenantId }, id) => setClientStatus(db, tenantId, id, String(fd.get("status")) as never, String(fd.get("reason") ?? ""), "owner"), "status");
+}
+export async function saveClientChannel(fd: FormData) {
+  const { setPreferredChannel } = await import("@/lib/client-model");
+  await clientAction(fd, ({ db, tenantId }, id) => setPreferredChannel(db, tenantId, id, String(fd.get("channel")), "owner"), "channel");
+}
+export async function saveClientNote(fd: FormData) {
+  const { addNote } = await import("@/lib/client-model");
+  await clientAction(fd, ({ db, tenantId }, id) => addNote(db, tenantId, id, String(fd.get("category")), String(fd.get("body") ?? ""), "owner"), "note");
+}
+export async function saveComplaint(fd: FormData) {
+  const { addComplaint } = await import("@/lib/client-model");
+  await clientAction(fd, ({ db, tenantId }, id) => addComplaint(db, tenantId, id, String(fd.get("body") ?? ""), "owner"), "complaint");
+}
+export async function closeComplaint(fd: FormData) {
+  const { resolveComplaint } = await import("@/lib/client-model");
+  await clientAction(fd, ({ db, tenantId }) => resolveComplaint(db, tenantId, String(fd.get("id")), String(fd.get("resolution") ?? ""), "owner"), "resolved");
+}
+export async function saveReview(fd: FormData) {
+  const { addReview } = await import("@/lib/client-model");
+  await clientAction(fd, ({ db, tenantId }, id) => addReview(db, tenantId, id, Number(fd.get("rating")), String(fd.get("body") ?? ""), "owner"), "review");
+}

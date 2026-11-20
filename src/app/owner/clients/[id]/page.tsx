@@ -3,10 +3,13 @@ import OwnerShell from "@/components/OwnerShell";
 import { getDb, one, rows } from "@/lib/db";
 import { formatLocal } from "@/lib/tz";
 import { ACTION_LABEL, actorLabel } from "@/lib/owner-queries";
+import { CHANNELS, CHANNEL_LABEL, NOTE_CATEGORIES, NOTE_LABEL, STATUS_HELP, STATUS_LABEL, type ClientStatus } from "@/lib/client-model";
+import { closeComplaint, saveClientChannel, saveClientNote, saveClientStatus, saveComplaint, saveReview } from "../../actions";
 export const dynamic = "force-dynamic";
 
-export default async function Client({ params }: { params: Promise<{ id: string }> }) {
+export default async function Client({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ m?: string }> }) {
   const { id } = await params;
+  const m = (await searchParams).m;
   const back = encodeURIComponent(`/owner/clients/${id}`);
   return (
     <OwnerShell current="clients">
@@ -26,10 +29,76 @@ export default async function Client({ params }: { params: Promise<{ id: string 
           ...consents.flatMap((k) => [{ at: k.granted_at, text: `Согласие дано: ${k.purpose === "marketing" ? "маркетинговые сообщения" : "обработка данных для записи"}` }, ...(k.withdrawn_at ? [{ at: k.withdrawn_at, text: `Согласие отозвано: ${k.purpose === "marketing" ? "маркетинговые сообщения" : "обработка данных для записи"}` }] : [])]),
           { at: c.created_at, text: "Клиент появился в базе" },
         ].sort((x, y) => (x.at < y.at ? 1 : -1));
+        let ready = true;
+        let state: { status: ClientStatus; preferred_channel: string } | null = null;
+        let notes: { id: string; category: string; body: string; created_at: string }[] = [];
+        let complaints: { id: string; body: string; status: string; resolution: string | null; created_at: string }[] = [];
+        let reviews: { id: string; rating: number; body: string; created_at: string }[] = [];
+        let hist: { status: string; reason: string; changed_by: string; created_at: string }[] = [];
+        try {
+          state = (await rows<{ status: ClientStatus; preferred_channel: string }>(db, "SELECT status,preferred_channel FROM client_state WHERE client_id=?1 AND tenant_id=?2", [c.id, t.id]))[0] ?? null;
+          notes = await rows(db, "SELECT id,category,body,created_at FROM client_notes WHERE client_id=?1 AND tenant_id=?2 ORDER BY created_at DESC LIMIT 50", [c.id, t.id]);
+          complaints = await rows(db, "SELECT id,body,status,resolution,created_at FROM complaints WHERE client_id=?1 AND tenant_id=?2 ORDER BY created_at DESC LIMIT 20", [c.id, t.id]);
+          reviews = await rows(db, "SELECT id,rating,body,created_at FROM reviews WHERE client_id=?1 AND tenant_id=?2 ORDER BY created_at DESC LIMIT 20", [c.id, t.id]);
+          hist = await rows(db, "SELECT status,reason,changed_by,created_at FROM client_status_history WHERE client_id=?1 AND tenant_id=?2 ORDER BY created_at DESC, rowid DESC LIMIT 10", [c.id, t.id]);
+        } catch { ready = false; }
+        const MSG: Record<string, [boolean, string]> = { status: [true, "Статус сохранён"], channel: [true, "Канал сохранён"], note: [true, "Заметка добавлена"], complaint: [true, "Жалоба записана"], resolved: [true, "Жалоба закрыта"], review: [true, "Отзыв добавлен"], bad: [false, "Проверьте введённые данные"], migration: [false, "Нужна миграция 0010"] };
+        const msg = m ? MSG[m] : undefined;
+        const fmtD = (iso: string) => formatLocal(new Date(iso).getTime(), "ru");
         const STATUS: Record<string, string> = { confirmed: "подтверждена", cancelled: "отменена", completed: "состоялась", no_show: "не пришла", requested: "заявка", held: "удержание" };
         return (<>
           <h1>{c.name}</h1>
           <div className="item"><small>Контакт: {c.contact}</small><small>Язык: {c.preferred_locale.toUpperCase()} · источник: {Object.entries(c.created_from).map(([k, v]) => `${k}=${v}`).join(", ") || "прямой заход"}</small></div>
+          {msg && <p className={msg[0] ? "msg-ok" : "msg-error"} role="status">{msg[1]}</p>}
+          {!ready ? <section className="panel warnbox"><h2>Нужна миграция 0010</h2><p>Статусы, заметки, жалобы и отзывы заработают после её применения.</p></section> : (<>
+          <section className="panel">
+            <h2>Статус и связь</h2>
+            <p>Статус: <span className="badge">{STATUS_LABEL[state?.status ?? "active"]}</span> <small className="hint">{STATUS_HELP[state?.status ?? "active"]}</small></p>
+            <form action={saveClientStatus} className="sched-set">
+              <input type="hidden" name="client" value={c.id} />
+              <label className="field"><span>Поставить вручную</span><select name="status" defaultValue={state?.status ?? "active"}>{(Object.keys(STATUS_LABEL) as ClientStatus[]).map((k) => <option key={k} value={k}>{STATUS_LABEL[k]}</option>)}</select></label>
+              <label className="field"><span>Причина (по желанию)</span><input name="reason" maxLength={300} /></label>
+              <div className="row"><button className="btn btn-secondary btn-sm" type="submit">Сохранить статус</button></div>
+            </form>
+            <form action={saveClientChannel} className="sched-set">
+              <input type="hidden" name="client" value={c.id} />
+              <label className="field"><span>Предпочитаемый канал связи</span><select name="channel" defaultValue={state?.preferred_channel ?? "email"}>{CHANNELS.map((k) => <option key={k} value={k}>{CHANNEL_LABEL[k]}</option>)}</select></label>
+              <div className="row"><button className="btn btn-secondary btn-sm" type="submit">Сохранить канал</button></div>
+            </form>
+            {hist.length > 0 && <details><summary>История статусов</summary><ul className="plain">{hist.map((h, i) => <li key={i}>{fmtD(h.created_at)}: {STATUS_LABEL[h.status as ClientStatus] ?? h.status} · {h.reason} ({h.changed_by === "system" ? "система" : "мастер"})</li>)}</ul></details>}
+          </section>
+          <section className="panel">
+            <h2>Заметки</h2>
+            <form action={saveClientNote} className="sched-set">
+              <input type="hidden" name="client" value={c.id} />
+              <label className="field"><span>Тема</span><select name="category">{NOTE_CATEGORIES.map((k) => <option key={k} value={k}>{NOTE_LABEL[k]}</option>)}</select></label>
+              <label className="field"><span>Текст заметки</span><textarea name="body" rows={3} maxLength={1500} required /></label>
+              <div className="row"><button className="btn btn-primary btn-sm" type="submit">Добавить заметку</button></div>
+            </form>
+            <div className="list">{notes.map((n) => <div key={n.id} className="item"><div className="top"><span className="badge">{NOTE_LABEL[n.category as keyof typeof NOTE_LABEL] ?? n.category}</span><small>{fmtD(n.created_at)}</small></div><small style={{ whiteSpace: "pre-wrap" }}>{n.body}</small></div>)}</div>
+          </section>
+          <section className="panel">
+            <h2>Жалобы</h2>
+            <form action={saveComplaint} className="sched-set">
+              <input type="hidden" name="client" value={c.id} />
+              <label className="field"><span>Что случилось</span><textarea name="body" rows={2} maxLength={2000} required /></label>
+              <div className="row"><button className="btn btn-secondary btn-sm" type="submit">Записать жалобу</button></div>
+            </form>
+            <div className="list">{complaints.map((k) => <div key={k.id} className="item"><div className="top"><span>{k.body}</span><span className={`badge ${k.status === "open" ? "warn" : "ok"}`}>{k.status === "open" ? "открыта" : "закрыта"}</span></div><small>{fmtD(k.created_at)}{k.resolution ? ` · решение: ${k.resolution}` : ""}</small>
+              {k.status === "open" && <form action={closeComplaint} className="row"><input type="hidden" name="client" value={c.id} /><input type="hidden" name="id" value={k.id} /><input name="resolution" placeholder="Как решили" aria-label="Как решили" maxLength={1000} /><button className="btn btn-secondary btn-sm" type="submit">Закрыть</button></form>}</div>)}</div>
+          </section>
+          <section className="panel">
+            <h2>Отзывы</h2>
+            <p className="hint" style={{ marginTop: 0 }}>Внутренние оценки. На сайт они не попадают: публиковать отзыв можно только с согласия клиента.</p>
+            <form action={saveReview} className="sched-set">
+              <input type="hidden" name="client" value={c.id} />
+              <label className="field"><span>Оценка</span><select name="rating" defaultValue="5">{[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
+              <label className="field"><span>Комментарий</span><input name="body" maxLength={1500} /></label>
+              <div className="row"><button className="btn btn-secondary btn-sm" type="submit">Добавить отзыв</button></div>
+            </form>
+            <div className="list">{reviews.map((r) => <div key={r.id} className="item"><div className="top"><span>Оценка {r.rating} из 5</span><small>{fmtD(r.created_at)}</small></div>{r.body && <small>{r.body}</small>}</div>)}</div>
+          </section>
+          </>)}
           <section><h2>Хронология</h2><div className="list">
             {tl.map((e, i) => e.href
               ? <a key={i} className="item" href={e.href} style={{ textDecoration: "none", color: "inherit" }}><div className="top"><span>{e.text}</span><small>{formatLocal(new Date(e.at).getTime(), "ru")}</small></div></a>
