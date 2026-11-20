@@ -1,11 +1,12 @@
 import OwnerShell from "@/components/OwnerShell";
 import { getDb, rows } from "@/lib/db";
 import { formatLocal } from "@/lib/tz";
-import { activateVersion, approveDraft, publishVersion, replyHandoff, resolveHandoff, saveDraft } from "../actions";
+import { activateVersion, approveDraft, publishVersion, replyHandoff, resolveHandoff, saveDraft, decideVip } from "../actions";
 import { getPolicies } from "@/lib/policies";
+import { vipRequests } from "@/lib/loyalty";
 export const dynamic = "force-dynamic";
 
-const REASON: Record<string, string> = { medical: "медицинский вопрос", out_of_knowledge: "нет утверждённого ответа", client_requested_human: "клиент просит человека", no_slots: "нет свободного времени" };
+const REASON: Record<string, string> = { medical: "медицинский вопрос", out_of_knowledge: "нет утверждённого ответа", client_requested_human: "клиент просит человека", no_slots: "нет свободного времени", vip_urgent: "срочная просьба VIP-клиента", late_change: "перенос или отмена ближе лимита", change_booking: "перенос или отмена записи" };
 
 export default async function AiPage({ searchParams }: { searchParams: Promise<{ m?: string }> }) {
   const m = (await searchParams).m;
@@ -13,6 +14,7 @@ export default async function AiPage({ searchParams }: { searchParams: Promise<{
     <OwnerShell current="ai">
       {async (t) => {
         const db = await getDb();
+        const vr = await vipRequests(db, t.id);
         const busy = (await getPolicies(db, t.id)).values.master_busy === 1;
         const hs = await rows<{ id: string; reason: string; summary: string; contact: string | null; status: string; created_at: string }>(db, "SELECT id,reason,summary,contact,status,created_at FROM handoffs WHERE tenant_id=?1 ORDER BY (status='open') DESC, created_at DESC LIMIT 30", [t.id]);
         const arts = await rows<{ id: string; key: string; locale: string; title: string; answer: string; draft_answer: string | null; approved_by: string | null }>(db, "SELECT id,key,locale,title,answer,draft_answer,approved_by FROM knowledge_articles WHERE tenant_id=?1 ORDER BY key, locale", [t.id]);
@@ -36,6 +38,9 @@ export default async function AiPage({ searchParams }: { searchParams: Promise<{
               </div>))}</div>
           </section>
           <p className="hint">Клиенты, которым ИИ не нашёл времени и которые оставили контакт, попадают в <a href="/owner/calendar#waitlist">лист ожидания в Календаре</a>.</p>
+          {vr.length > 0 && <section className="panel"><h2>Срочные запросы VIP-клиентов</h2>
+            <div className="list">{vr.map((r) => <div key={r.id} className="item"><div className="top"><span>{r.name}</span><span className={`badge ${r.status === "pending" ? "warn" : "ok"}`}>{r.status === "pending" ? "ждёт решения" : r.status === "approved" ? "одобрено" : "отклонено"}</span></div><small>{r.note} · {formatLocal(new Date(r.created_at).getTime(), "ru")}</small>
+              {r.status === "pending" && <form action={decideVip} className="sched-set"><input type="hidden" name="id" value={r.id} /><label className="field"><span>Ответ клиенту (план)</span><input name="note" maxLength={300} /></label><div className="row"><button className="btn btn-primary btn-sm" type="submit" name="approve" value="1">Одобрить</button><button className="btn btn-secondary btn-sm" type="submit" name="approve" value="0">Отклонить</button></div></form>}</div>)}</div></section>}
           <section><h2>Что знает ИИ</h2>
             <p className="warnbox" style={{ marginBottom: 12 }}>ИИ отвечает только по опубликованной версии. Сейчас тексты — нейтральные заглушки, мастер их ещё не утвердил. Правка попадает к клиентам только после «Утвердить» и «Опубликовать версию»{drafts ? ` (черновиков: ${drafts})` : ""}.</p>
             <div className="list">{keys.map((k) => (

@@ -4,6 +4,8 @@ import { getDb, one, rows } from "@/lib/db";
 import { formatLocal } from "@/lib/tz";
 import { ACTION_LABEL, actorLabel } from "@/lib/owner-queries";
 import { CHANNELS, CHANNEL_LABEL, NOTE_CATEGORIES, NOTE_LABEL, STATUS_HELP, STATUS_LABEL, type ClientStatus } from "@/lib/client-model";
+import { balance, isVip, ledger, referralCode } from "@/lib/loyalty";
+import { saveLoyaltyAdjust, saveLoyaltyRedeem, saveVip } from "../../actions";
 import { closeComplaint, saveClientChannel, saveClientNote, saveClientStatus, saveComplaint, saveReview } from "../../actions";
 export const dynamic = "force-dynamic";
 
@@ -42,7 +44,9 @@ export default async function Client({ params, searchParams }: { params: Promise
           reviews = await rows(db, "SELECT id,rating,body,created_at FROM reviews WHERE client_id=?1 AND tenant_id=?2 ORDER BY created_at DESC LIMIT 20", [c.id, t.id]);
           hist = await rows(db, "SELECT status,reason,changed_by,created_at FROM client_status_history WHERE client_id=?1 AND tenant_id=?2 ORDER BY created_at DESC, rowid DESC LIMIT 10", [c.id, t.id]);
         } catch { ready = false; }
-        const MSG: Record<string, [boolean, string]> = { status: [true, "Статус сохранён"], channel: [true, "Канал сохранён"], note: [true, "Заметка добавлена"], complaint: [true, "Жалоба записана"], resolved: [true, "Жалоба закрыта"], review: [true, "Отзыв добавлен"], bad: [false, "Проверьте введённые данные"], migration: [false, "Нужна миграция 0010"] };
+        const bal = await balance(db, t.id, c.id), led = await ledger(db, t.id, c.id), vip = await isVip(db, t.id, c.id), code = await referralCode(db, t.id, c.id);
+        const money = (n: number) => `${n < 0 ? "−" : ""}€${Math.trunc(Math.abs(n) / 100)}.${String(Math.abs(n) % 100).padStart(2, "0")}`;
+        const MSG: Record<string, [boolean, string]> = { status: [true, "Статус сохранён"], channel: [true, "Канал сохранён"], note: [true, "Заметка добавлена"], complaint: [true, "Жалоба записана"], resolved: [true, "Жалоба закрыта"], review: [true, "Отзыв добавлен"], bad: [false, "Проверьте введённые данные"], loyalty: [true, "Бонусы обновлены"], vip: [true, "VIP-статус обновлён"], migration: [false, "Нужна миграция 0010"] };
         const msg = m ? MSG[m] : undefined;
         const fmtD = (iso: string) => formatLocal(new Date(iso).getTime(), "ru");
         const STATUS: Record<string, string> = { confirmed: "подтверждена", cancelled: "отменена", completed: "состоялась", no_show: "не пришла", requested: "заявка", held: "удержание" };
@@ -66,6 +70,24 @@ export default async function Client({ params, searchParams }: { params: Promise
               <div className="row"><button className="btn btn-secondary btn-sm" type="submit">Сохранить канал</button></div>
             </form>
             {hist.length > 0 && <details><summary>История статусов</summary><ul className="plain">{hist.map((h, i) => <li key={i}>{fmtD(h.created_at)}: {STATUS_LABEL[h.status as ClientStatus] ?? h.status} · {h.reason} ({h.changed_by === "system" ? "система" : "мастер"})</li>)}</ul></details>}
+          </section>
+          <section className="panel">
+            <h2>Бонусы и VIP</h2>
+            <p>Баланс: <b>{money(bal)}</b> <small className="hint">Все размеры бонусов сейчас тестовые: решение о реальных условиях за вами.</small></p>
+            {code && <p className="hint">Код приглашения: <b>{code}</b> · ссылка для друга: /ru?ref={code}. Награда начисляется только после того, как друг придёт на визит.</p>}
+            <form action={saveLoyaltyRedeem} className="sched-set"><input type="hidden" name="client" value={c.id} />
+              <label className="field"><span>Списать бонусы, €</span><input name="amount" inputMode="decimal" placeholder="например 3.00" /></label>
+              <label className="field"><span>За что</span><input name="reason" maxLength={200} /></label>
+              <div className="row"><button className="btn btn-secondary btn-sm" type="submit">Списать</button></div></form>
+            <form action={saveLoyaltyAdjust} className="sched-set"><input type="hidden" name="client" value={c.id} />
+              <label className="field"><span>Корректировка или компенсация, € (минус уменьшает)</span><input name="amount" inputMode="decimal" placeholder="например 5.00" /></label>
+              <label className="field"><span>Причина (обязательно)</span><input name="reason" maxLength={200} required /></label>
+              <div className="row"><button className="btn btn-secondary btn-sm" type="submit">Применить</button></div></form>
+            {led.length > 0 && <details><summary>Журнал бонусов</summary><ul className="plain">{led.map((l) => <li key={l.id}>{fmtD(l.created_at)}: {money(l.amount_cents)} · {l.reason}{l.is_test ? " (тест)" : ""}</li>)}</ul></details>}
+            <form action={saveVip} className="sched-set"><input type="hidden" name="client" value={c.id} /><input type="hidden" name="on" value={vip ? "0" : "1"} />
+              <p>VIP: <b>{vip ? "да" : "нет"}</b>. VIP даёт срочную запись по вашему решению. ИИ статус не выдаёт.</p>
+              {!vip && <label className="field"><span>Причина (по желанию)</span><input name="reason" maxLength={200} /></label>}
+              <div className="row"><button className="btn btn-secondary btn-sm" type="submit">{vip ? "Снять VIP" : "Назначить VIP"}</button></div></form>
           </section>
           <section className="panel">
             <h2>Заметки</h2>

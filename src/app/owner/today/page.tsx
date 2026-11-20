@@ -28,7 +28,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
         const jobsOk = await jobsReady(db);
         const jobs = jobsOk ? await recentJobs(db, t.id, 5) : [];
         const o = brief.open;
-        const spoken = brief.visits.length ? `На ${brief.label} записей: ${brief.visits.length}. ` + brief.visits.map((v) => `${v.time}, ${v.name}, ${v.service}${v.first ? ", первый визит" : ""}`).join(". ") : `На ${brief.label} записей нет.`;
+        const spoken = brief.visits.length ? `На завтра, ${brief.label}, записей: ${brief.visits.length}. ` + brief.visits.map((v) => `${v.time}, ${v.name}, ${v.service}${v.first ? ", первый визит" : ""}`).join(". ") : `На завтра, ${brief.label}, записей нет.`;
         const activity = await recentActivity(db, t.id, 10);
         const groups = new Map<string, typeof next>();
         for (const a of next) { const k = dayKey(a.start_at); groups.set(k, [...(groups.get(k) ?? []), a]); }
@@ -40,7 +40,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
           {sp.m === "jobs" && <p className="msg-ok" role="status">Фоновые задачи выполнены: {sp.n}, с ошибкой: {sp.f}.</p>}
           {sp.m === "jobs_migration" && <p className="msg-error" role="status">Нужна миграция 0012 (очередь задач).</p>}
           <section className="panel" aria-labelledby="brief-h">
-            <h2 id="brief-h">Сводка на {brief.label}</h2>
+            <h2 id="brief-h">Сводка на завтра: {brief.label}</h2>
             {brief.visits.length === 0 ? <p className="hint">Записей нет.</p> : (
               <ul className="plain">{brief.visits.map((v, i) => <li key={i}><b>{v.time}</b> · {v.name} · {v.service}{v.first ? " · первый визит" : ""}{v.notes.length ? <><br /><small className="hint">Важно: {v.notes.join("; ")}</small></> : null}</li>)}</ul>
             )}

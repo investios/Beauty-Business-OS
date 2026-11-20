@@ -51,7 +51,7 @@ async function staffFor(db: Db, tenantId: string, serviceId: string) {
 }
 
 /** Реальные свободные окна: рабочие часы (местное время) минус занятые записи, с учётом перехода на летнее/зимнее время. */
-export async function getAvailability(db: Db, p: { tenantId: string; serviceId: string; from?: Date; days?: number; staffId?: string; now?: Date; tz?: string; excludeAppointmentId?: string }): Promise<(Slot & { staffId: string })[]> {
+export async function getAvailability(db: Db, p: { tenantId: string; serviceId: string; from?: Date; days?: number; staffId?: string; now?: Date; tz?: string; excludeAppointmentId?: string; ignoreReserve?: boolean }): Promise<(Slot & { staffId: string })[]> {
   const now = p.now ?? new Date();
   const tz = p.tz ?? DEFAULT_TZ;
   await expireHolds(db, now);
@@ -112,7 +112,21 @@ export async function getAvailability(db: Db, p: { tenantId: string; serviceId: 
       }
     }
   }
-  return out.sort((a, b) => a.startUtc.localeCompare(b.startUtc));
+  out.sort((a, b) => a.startUtc.localeCompare(b.startUtc));
+  return p.ignoreReserve ? out : applyVipReserve(out, (await getPolicies(db, p.tenantId)).values, now.getTime(), tz);
+}
+
+/** Резерв для VIP: в каждом дне скрываем долю самых поздних окон от обычной записи, пока до визита больше vip_release_hours. Мастер и VIP-запись резерв видят (ignoreReserve). */
+export function applyVipReserve<T extends { startUtc: string }>(slots: T[], pol: { vip_reserve_pct: number; vip_release_hours: number }, nowMs: number, tz: string): T[] {
+  if (!pol.vip_reserve_pct) return slots;
+  const byDay = new Map<string, T[]>();
+  for (const s of slots) { const k = dayKey(localParts(new Date(s.startUtc).getTime(), tz)); byDay.set(k, [...(byDay.get(k) ?? []), s]); }
+  const hidden = new Set<T>();
+  for (const list of byDay.values()) {
+    const n = Math.ceil((list.length * pol.vip_reserve_pct) / 100);
+    for (const s of list.slice(list.length - n)) if (new Date(s.startUtc).getTime() - nowMs > pol.vip_release_hours * 3600000) hidden.add(s);
+  }
+  return slots.filter((s) => !hidden.has(s));
 }
 
 function normContact(c: string) {
@@ -173,7 +187,7 @@ export async function createBooking(db: Db, input: BookingInput): Promise<Bookin
   if (!svc) throw new BookingError("not_found", "service not found");
 
   // Слот обязан быть из реального расчёта доступности (а не придуман клиентом/ИИ)
-  const avail = await getAvailability(db, { tenantId: input.tenantId, serviceId: input.serviceId, from: new Date(start.getTime() - 86400000), days: 3, staffId: input.staffId, now, tz });
+  const avail = await getAvailability(db, { tenantId: input.tenantId, serviceId: input.serviceId, from: new Date(start.getTime() - 86400000), days: 3, staffId: input.staffId, now, tz, ignoreReserve: !!input.ownerOverride });
   const match = avail.find((a) => a.startUtc === start.toISOString());
   let staffId = match?.staffId;
   let hold: { id: string; staff_id: string } | null = null;

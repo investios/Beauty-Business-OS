@@ -3,7 +3,8 @@ import { auditStmt, nowIso, one, rows, uuid, type Db } from "@/lib/db";
 /** Реестр правил бизнеса. Значения по умолчанию взяты из ТЗ v2.0; мастер меняет их в «Настройках». */
 export type PolicyKey =
   | "cancel_limit_hours" | "remind_evening_before" | "remind_two_days" | "remind_two_days_min_ahead_days" | "remind_morning" | "remind_one_hour"
-  | "followup_after_hours" | "rebook_after_days" | "master_busy";
+  | "followup_after_hours" | "rebook_after_days" | "master_busy"
+  | "loyalty_visit_bonus_cents" | "referral_reward_cents" | "referral_friend_cents" | "vip_reserve_pct" | "vip_release_hours";
 type Def = { label: string; hint: string; kind: "int" | "bool"; def: number; min?: number; max?: number; unit?: string };
 export const POLICY_DEFS: Record<PolicyKey, Def> = {
   cancel_limit_hours: { label: "Отмена и перенос клиентом не позже, чем за", hint: "Ближе этого срока ИИ и ссылка не отменяют запись сами, а передают вопрос мастеру", kind: "int", def: 12, min: 0, max: 168, unit: "ч" },
@@ -14,6 +15,11 @@ export const POLICY_DEFS: Record<PolicyKey, Def> = {
   remind_one_hour: { label: "Напоминание за час до визита", hint: "Выключено по умолчанию", kind: "bool", def: 0 },
   followup_after_hours: { label: "Спросить, как прошла процедура, через", hint: "После того как мастер отметил визит состоявшимся", kind: "int", def: 24, min: 2, max: 168, unit: "ч" },
   master_busy: { label: "Режим «мастер занят»", hint: "ИИ предупреждает клиентов, что вы сейчас на процедуре и ответите позже. Запись и справочные ответы работают как обычно", kind: "bool", def: 0 },
+  loyalty_visit_bonus_cents: { label: "ТЕСТ: бонус клиенту за состоявшийся визит", hint: "Тестовое значение для проверки механизма, размер решает мастер. 0 выключает начисления", kind: "int", def: 300, min: 0, max: 100000, unit: "центов" },
+  referral_reward_cents: { label: "ТЕСТ: награда приглашающему за друга", hint: "Начисляется только после того, как друг пришёл на визит. Тестовое значение", kind: "int", def: 1000, min: 0, max: 100000, unit: "центов" },
+  referral_friend_cents: { label: "ТЕСТ: приветственный бонус другу", hint: "Начисляется после его первого визита. Тестовое значение", kind: "int", def: 500, min: 0, max: 100000, unit: "центов" },
+  vip_reserve_pct: { label: "Резерв времени для VIP, % свободных окон в день", hint: "0 выключает. Скрыто от обычной записи, видно только вам. Рекомендуется 10", kind: "int", def: 0, min: 0, max: 50, unit: "%" },
+  vip_release_hours: { label: "Освобождать резерв за", hint: "Окна резерва снова становятся доступны всем за столько часов до визита", kind: "int", def: 48, min: 1, max: 168, unit: "ч" },
   rebook_after_days: { label: "Предложить повторный визит через", hint: "Только клиентам с согласием на предложения. Значение тестовое, уточняется по каждой услуге", kind: "int", def: 28, min: 7, max: 365, unit: "дн" },
 };
 export const POLICY_KEYS = Object.keys(POLICY_DEFS) as PolicyKey[];

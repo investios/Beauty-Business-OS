@@ -9,15 +9,15 @@ const T = new Date("2026-11-10T19:30:00Z").getTime(); // 19:30 Дублин (з�
 describe("очередь задач", () => {
   it("идемпотентность: повторное планирование в то же окно ничего не добавляет; сводка только после 19:00", async () => {
     const c = await setup();
-    expect(await planJobs(c.db, c.tenantId, T)).toBe(3);
+    expect(await planJobs(c.db, c.tenantId, T)).toBe(4);
     expect(await planJobs(c.db, c.tenantId, T + 60000)).toBe(0);
-    expect(await planJobs(c.db, c.tenantId, new Date("2026-11-10T10:00:00Z").getTime())).toBe(1); // утром только своё окно «lifecycle»
+    expect(await planJobs(c.db, c.tenantId, new Date("2026-11-10T10:00:00Z").getTime())).toBe(2); // утром: окно lifecycle и часовая задача лояльности
     expect(await c.db.all("SELECT 1 FROM jobs WHERE kind='evening_brief'")).toHaveLength(1);
   });
   it("запуск выполняет задачи один раз; параллельный запуск не дублирует; сводка сохраняется", async () => {
     const c = await setup();
     const [a, b] = await Promise.all([runDueJobs(c.db, c.tenantId, T), runDueJobs(c.db, c.tenantId, T)]);
-    expect(a.ran + b.ran).toBe(3);
+    expect(a.ran + b.ran).toBe(4);
     expect((await c.db.all<{ status: string }>("SELECT status FROM jobs")).every((j) => j.status === "done")).toBe(true);
     expect(await c.db.all("SELECT 1 FROM daily_briefs WHERE tenant_id=?1", [c.tenantId])).toHaveLength(1);
     expect((await runDueJobs(c.db, c.tenantId, T + 120000)).ran).toBe(0);

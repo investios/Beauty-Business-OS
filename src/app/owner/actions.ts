@@ -329,3 +329,25 @@ export async function runJobsNow() {
   revalidatePath("/owner/today");
   redirect(r.ready ? `/owner/today?m=jobs&n=${r.ran}&f=${r.failed}` : "/owner/today?m=jobs_migration");
 }
+
+/** Лояльность и VIP: решает только мастер */
+const eur = (s: string) => { const m = s.trim().replace(",", ".").match(/^(-?)(\d{1,5})(?:\.(\d{1,2}))?$/); return m ? (m[1] ? -1 : 1) * (Number(m[2]) * 100 + Number((m[3] ?? "").padEnd(2, "0") || 0)) : NaN; };
+export async function saveLoyaltyRedeem(fd: FormData) {
+  const { redeem } = await import("@/lib/loyalty");
+  await clientAction(fd, async ({ db, tenantId }, id) => (await redeem(db, tenantId, id, eur(String(fd.get("amount") ?? "")), String(fd.get("reason") ?? ""), "owner")) === "ok", "loyalty");
+}
+export async function saveLoyaltyAdjust(fd: FormData) {
+  const { adjust } = await import("@/lib/loyalty");
+  await clientAction(fd, async ({ db, tenantId }, id) => (await adjust(db, tenantId, id, eur(String(fd.get("amount") ?? "")), String(fd.get("reason") ?? ""), "owner")) === "ok", "loyalty");
+}
+export async function saveVip(fd: FormData) {
+  const { setVip } = await import("@/lib/loyalty");
+  await clientAction(fd, ({ db, tenantId }, id) => setVip(db, tenantId, id, fd.get("on") === "1", String(fd.get("reason") ?? ""), "owner"), "vip");
+}
+export async function decideVip(fd: FormData) {
+  const { tenantId, db } = await guard();
+  const { decideVipRequest } = await import("@/lib/loyalty");
+  const ok = await decideVipRequest(db, tenantId, String(fd.get("id")), fd.get("approve") === "1", String(fd.get("note") ?? ""), "owner");
+  revalidatePath("/owner/ai");
+  redirect(`/owner/ai?m=${ok ? "vipdone" : "bad"}`);
+}

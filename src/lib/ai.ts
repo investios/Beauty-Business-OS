@@ -2,6 +2,7 @@ import { getPolicies } from "./policies";
 import { addToWaitlist } from "./waitlist";
 import { HELLO, addAiNote, clientContext } from "./client-context";
 import { toolAllowed } from "./ai-tools";
+import { isVip, requestVipUrgent } from "./loyalty";
 import { audit, js, nowIso, one, rows, uuid, type Db } from "./db";
 import { getAvailability, listServices } from "./booking";
 import { formatLocal } from "./tz";
@@ -92,6 +93,7 @@ const T = {
     ru: "Конечно. Я передал это мастеру. Оставьте телефон или почту, чтобы он мог с вами связаться.",
     uk: "Звісно. Я передав це майстру. Залиште телефон або пошту, щоб він міг зв'язатися з вами.",
   },
+  vipUrgent: { en: "I have passed your urgent request to the specialist. She will suggest a time herself.", ru: "Передал вашу срочную просьбу мастеру. Время предложит она сама.", uk: "Передав ваше термінове прохання майстру. Час запропонує вона сама." },
   busy: {
     en: "The specialist is with a client right now and will reply as soon as she is free.",
     ru: "Мастер сейчас на процедуре и ответит, как только освободится.",
@@ -188,6 +190,17 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
     if (hi) tools.push({ tool: "recognizeClient", ok: true, detail: "greeted" });
     await db.run("INSERT INTO messages(id,conversation_id,role,content,knowledge_version,meta,created_at) VALUES (?1,?2,'assistant',?3,?4,?5,?6)", [uuid(), conv.id, msg, kbv.version, js({ intents: ["booking"], citations, tools, engine, recognized: !!hi }), nowIso()]);
     return { message: msg, locale, intent: "booking", knowledgeVersion: kbv.version, citations, slots: out.slots, pending: out.pending, requiresHuman, handoffId, toolResults: tools, engine };
+  }
+  // Срочная запись VIP-клиента: ИИ ничего не бронирует, он передаёт запрос мастеру, а план предлагает мастер
+  if (/(срочн|как можно скорее|сегодня же|urgent|asap|терміново)/i.test(text) && primary !== "medical") {
+    const who = await clientContext(db, p.tenantId, conv.id, p.now);
+    if (who && (await isVip(db, p.tenantId, who.clientId)) && (await requestVipUrgent(db, p.tenantId, who.clientId, text.slice(0, 300)))) {
+      handoffId = await handoff(db, p.tenantId, conv.id, "vip_urgent", text);
+      tools.push({ tool: "requestHandoff", ok: true, detail: "vip_urgent" });
+      const msg = (await getPolicies(db, p.tenantId)).values.master_busy ? `${T.vipUrgent[locale]} ${T.busy[locale]}` : T.vipUrgent[locale];
+      await db.run("INSERT INTO messages(id,conversation_id,role,content,knowledge_version,meta,created_at) VALUES (?1,?2,'assistant',?3,?4,?5,?6)", [uuid(), conv.id, msg, kbv.version, js({ intents: ["booking"], citations, tools, engine }), nowIso()]);
+      return { message: msg, locale, intent: "booking", knowledgeVersion: kbv.version, citations, requiresHuman: true, handoffId, toolResults: tools, engine };
+    }
   }
   // Вопрос вне сценариев: пробуем модель (Cloudflare Workers AI) по утверждённым знаниям; при отказе, сбое или небезопасном ответе — передача мастеру
   let llmText: string | null = null;

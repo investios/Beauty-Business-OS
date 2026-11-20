@@ -2,12 +2,13 @@ import { auditStmt, nowIso, rows, uuid, type Db } from "./db";
 import { buildBrief, saveBrief } from "./brief";
 import { refreshClientStatuses } from "./client-model";
 import { runLifecycle } from "./lifecycle";
+import { runLoyalty } from "./loyalty";
 import { localParts } from "./tz";
 
 /** Очередь фоновых задач. Правила: у каждой задачи уникальный run_key (повторный запуск ничего не дублирует);
  *  задачу «берёт» один исполнитель (compare-and-set); при ошибке до 3 попыток с паузой; результат и ошибка сохраняются.
  *  Исполнитель вызывается по расписанию (внешний триггер раз в 15 минут) или кнопкой в кабинете. */
-export type JobKind = "lifecycle" | "client_status" | "evening_brief";
+export type JobKind = "lifecycle" | "client_status" | "evening_brief" | "loyalty";
 export const MAX_ATTEMPTS = 3, BACKOFF_MS = 10 * 60000;
 const z2 = (n: number) => String(n).padStart(2, "0");
 const BRIEF_HOUR = 19;
@@ -25,6 +26,7 @@ export async function planJobs(db: Db, tenantId: string, nowMs: number): Promise
   let n = 0;
   if (await enqueue(db, tenantId, "lifecycle", `lifecycle:${tenantId}:${Math.floor(nowMs / (15 * 60000))}`, at)) n++;
   if (await enqueue(db, tenantId, "client_status", `client_status:${tenantId}:${day}`, at)) n++;
+  if (await enqueue(db, tenantId, "loyalty", `loyalty:${tenantId}:${Math.floor(nowMs / 3600000)}`, at)) n++;
   if (p.h >= BRIEF_HOUR && (await enqueue(db, tenantId, "evening_brief", `evening_brief:${tenantId}:${day}`, at))) n++;
   return n;
 }
@@ -32,6 +34,7 @@ export async function planJobs(db: Db, tenantId: string, nowMs: number): Promise
 async function handle(db: Db, tenantId: string, kind: JobKind, nowMs: number): Promise<unknown> {
   if (kind === "lifecycle") { const r = await runLifecycle(db, tenantId, { nowMs, send: true }); return r; }
   if (kind === "client_status") return refreshClientStatuses(db, tenantId, new Date(nowMs));
+  if (kind === "loyalty") return runLoyalty(db, tenantId, nowMs);
   if (kind === "evening_brief") { const b = await buildBrief(db, tenantId, nowMs); await saveBrief(db, tenantId, b); return { day: b.day, visits: b.visits.length }; }
   throw new Error(`unknown job kind ${kind}`);
 }

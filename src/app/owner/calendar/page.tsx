@@ -54,13 +54,13 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         let dayFree: { id: string; title: string; slots: string[] }[] = [];
         if (services.length) {
           const probe = services[0];
-          const all = await getAvailability(db, { tenantId: t.id, serviceId: probe.id, from: sod(first), days: days });
+          const all = await getAvailability(db, { tenantId: t.id, serviceId: probe.id, from: sod(first), days: days, ignoreReserve: true });
           for (const s of all) { const k = ymdKey(localParts(new Date(s.startUtc).getTime())); freeByDay.set(k, (freeByDay.get(k) ?? 0) + 1); }
           if (view === "day") {
             const k = ymdKey(anchor);
             dayFree = [];
             for (const sv of services) {
-              const av = await getAvailability(db, { tenantId: t.id, serviceId: sv.id, from: sod(anchor), days: 0 });
+              const av = await getAvailability(db, { tenantId: t.id, serviceId: sv.id, from: sod(anchor), days: 0, ignoreReserve: true });
               dayFree.push({ id: sv.id, title: sv.title_i18n.ru ?? sv.title_i18n.en, slots: av.filter((s) => ymdKey(localParts(new Date(s.startUtc).getTime())) === k).map((s) => hm(s.startUtc)) });
             }
           }
@@ -78,7 +78,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           for (const w of wl) {
             const f = parseYmd(w.day_from)!, to = parseYmd(w.day_to)!;
             const span = Math.min(62, Math.round((Date.UTC(to.y, to.mo - 1, to.d) - Date.UTC(f.y, f.mo - 1, f.d)) / 86400000) + 1);
-            const av = await getAvailability(db, { tenantId: t.id, serviceId: w.service_id, from: sod(f), days: span - 1 });
+            const av = await getAvailability(db, { tenantId: t.id, serviceId: w.service_id, from: sod(f), days: span - 1, ignoreReserve: true });
             wlFree.set(w.id, av.filter((s) => { const k = ymdKey(localParts(new Date(s.startUtc).getTime())); return k >= w.day_from && k <= w.day_to; }).length);
           }
         } catch { /* таблицы ещё нет */ }
