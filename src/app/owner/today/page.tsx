@@ -1,12 +1,17 @@
 import OwnerShell from "@/components/OwnerShell";
 import { getDb, rows } from "@/lib/db";
 import { formatLocal } from "@/lib/tz";
+import { buildBrief } from "@/lib/brief";
+import { jobsReady, recentJobs } from "@/lib/jobs";
+import SpeakButton from "@/components/SpeakButton";
+import { runJobsNow } from "../actions";
 import { ACTION_LABEL, actorLabel, APPT_FILTERS, countAppts, listAppts, recentActivity, type ApptFilter } from "@/lib/owner-queries";
 export const dynamic = "force-dynamic";
 
 const dayKey = (iso: string) => new Intl.DateTimeFormat("ru-RU", { timeZone: "Europe/Dublin", weekday: "long", day: "numeric", month: "long" }).format(new Date(iso));
 
-export default function Overview() {
+export default async function Overview({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  const sp = await searchParams;
   return (
     <OwnerShell current="today">
       {async (t) => {
@@ -19,6 +24,11 @@ export default function Overview() {
         const handoffs = await one("SELECT count(*) n FROM handoffs WHERE tenant_id=?1 AND status='open'");
         const next = await listAppts(db, t.id, "week", now, { limit: 30 });
         const week = kpis.find((k) => k.f === "week")!.n;
+        const brief = await buildBrief(db, t.id, now);
+        const jobsOk = await jobsReady(db);
+        const jobs = jobsOk ? await recentJobs(db, t.id, 5) : [];
+        const o = brief.open;
+        const spoken = brief.visits.length ? `На ${brief.label} записей: ${brief.visits.length}. ` + brief.visits.map((v) => `${v.time}, ${v.name}, ${v.service}${v.first ? ", первый визит" : ""}`).join(". ") : `На ${brief.label} записей нет.`;
         const activity = await recentActivity(db, t.id, 10);
         const groups = new Map<string, typeof next>();
         for (const a of next) { const k = dayKey(a.start_at); groups.set(k, [...(groups.get(k) ?? []), a]); }
@@ -27,6 +37,21 @@ export default function Overview() {
         );
         return (<>
           <h1>Обзор</h1>
+          {sp.m === "jobs" && <p className="msg-ok" role="status">Фоновые задачи выполнены: {sp.n}, с ошибкой: {sp.f}.</p>}
+          {sp.m === "jobs_migration" && <p className="msg-error" role="status">Нужна миграция 0012 (очередь задач).</p>}
+          <section className="panel" aria-labelledby="brief-h">
+            <h2 id="brief-h">Сводка на {brief.label}</h2>
+            {brief.visits.length === 0 ? <p className="hint">Записей нет.</p> : (
+              <ul className="plain">{brief.visits.map((v, i) => <li key={i}><b>{v.time}</b> · {v.name} · {v.service}{v.first ? " · первый визит" : ""}{v.notes.length ? <><br /><small className="hint">Важно: {v.notes.join("; ")}</small></> : null}</li>)}</ul>
+            )}
+            <p className="hint">Ждут вас: вопросов {o.questions}, жалоб {o.complaints}, заявок без подтверждения {o.requested}, в листе ожидания {o.waitlist}, клиентов с пропущенным циклом {o.atRisk}.</p>
+            <div className="row"><SpeakButton text={spoken} /></div>
+            <details><summary>Фоновые задачи</summary>
+              <p className="hint">Вечерняя сводка, пересчёт статусов клиентов и сообщения клиентам выполняются по расписанию. Расписание подключается отдельно (см. инструкцию), а пока можно запустить вручную.</p>
+              {jobs.length > 0 && <ul className="plain">{jobs.map((j, i) => <li key={i}>{j.kind}: {j.status}{j.last_error ? ` (${j.last_error})` : ""}</li>)}</ul>}
+              <form action={runJobsNow}><button className="btn btn-secondary btn-sm" type="submit">Выполнить сейчас</button></form>
+            </details>
+          </section>
           <div className="stats">
             {kpis.map((k) => tile(`/owner/appointments?f=${k.f}`, k.n, APPT_FILTERS[k.f].label, APPT_FILTERS[k.f].def))}
             {tile("/owner/clients", clients, "Клиентов в базе", "все клиенты салона, без дублей по контакту")}

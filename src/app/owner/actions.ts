@@ -320,3 +320,12 @@ export async function replyHandoff(fd: FormData) {
   revalidatePath("/owner/ai");
   redirect(`/owner/ai?m=${ok ? "replied" : "bad"}`);
 }
+
+/** Запуск фоновых задач вручную (то же, что делает расписание) */
+export async function runJobsNow() {
+  const { tenantId, db } = await guard();
+  const { runDueJobs } = await import("@/lib/jobs");
+  const r = await runDueJobs(db, tenantId);
+  revalidatePath("/owner/today");
+  redirect(r.ready ? `/owner/today?m=jobs&n=${r.ran}&f=${r.failed}` : "/owner/today?m=jobs_migration");
+}
