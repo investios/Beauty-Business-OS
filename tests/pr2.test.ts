@@ -1,14 +1,17 @@
 import { describe, it, expect, vi } from "vitest";
 import { buildSystemPrompt } from "@/lib/llm";
 import { clientIp } from "@/lib/ratelimit";
+import type { Profile } from "@/lib/tenant-profile";
+
+const MILA: Profile = { masterName: "Мила", masterNameLatin: "Mila", studioName: "MK Extension Studio by Mila", city: "Дублин", addressForm: "vy", tone: "warm", forms: {}, about: "", configured: true };
 
 describe("PR-2: знания AI", () => {
   it("утверждённые знания идут отдельным блоком и главнее справочных", () => {
-    const p = buildSystemPrompt("ru", [{ title: "Консультация", answer: "Утверждённый текст про консультацию", locale: "ru" }, { title: "Other", answer: "english only", locale: "en" }], 3);
+    const p = buildSystemPrompt("ru", [{ title: "Консультация", answer: "Утверждённый текст про консультацию", locale: "ru" }, { title: "Other", answer: "english only", locale: "en" }], 3, MILA);
     expect(p).toContain("УТВЕРЖДЁННЫЕ ЗНАНИЯ (утверждены Милой, версия 3)");
     expect(p).toContain("Утверждённый текст про консультацию");
     expect(p).not.toContain("english only");
-    expect(p).toContain("НЕ утверждены Милой");
+    expect(p).toContain("ещё не утверждены (Мила)");
     expect(p.indexOf("УТВЕРЖДЁННЫЕ ЗНАНИЯ")).toBeLessThan(p.indexOf("СПРАВОЧНЫЕ СВЕДЕНИЯ"));
   });
   it("без утверждённых материалов прямо говорит об этом", () => {

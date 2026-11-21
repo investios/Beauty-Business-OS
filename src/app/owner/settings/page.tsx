@@ -1,7 +1,8 @@
 import OwnerShell from "@/components/OwnerShell";
 import { getDb, rows } from "@/lib/db";
 import { POLICY_DEFS, POLICY_KEYS, getPolicies, policyHistory } from "@/lib/policies";
-import { savePolicies, setBufferAll } from "../actions";
+import { savePolicies, setBufferAll, saveTenantProfile } from "../actions";
+import { getProfile, TONES } from "@/lib/tenant-profile";
 export const dynamic = "force-dynamic";
 
 const fmt = (iso: string) => new Intl.DateTimeFormat("ru-RU", { timeZone: "Europe/Dublin", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso));
@@ -14,17 +15,41 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       {async (t) => {
         const db = await getDb();
         const pol = await getPolicies(db, t.id);
+        const prof = await getProfile(db, t.id);
         const hist = await policyHistory(db, t.id, 20);
         const bufs = await rows<{ buffer_min: number; n: number }>(db, "SELECT buffer_min, COUNT(*) AS n FROM services WHERE tenant_id=?1 AND active=1 GROUP BY buffer_min", [t.id]);
         const msg: [boolean, string] | undefined =
           sp.m === "saved" ? [true, Number(sp.n) ? `Сохранено изменений: ${sp.n}. Действует для новых записей; уже созданные сохраняют условия, на которые клиент согласился.` : "Изменений нет."]
           : sp.m === "buffer" ? [true, `Пауза между клиентами: ${sp.n} мин для всех услуг.`]
+          : sp.m === "profile" ? [true, "Профиль сохранён. Тексты ассистента и сценариев теперь используют это имя."]
+          : sp.m === "profile_bad" ? [false, "Укажите имя мастера."]
+          : sp.m === "profile_migration" ? [false, "Профиль ещё не включён в базе: нужно применить миграцию 0017."]
           : sp.m === "migration" ? [false, "Правила ещё не включены в базе: нужно применить миграцию 0009."] : undefined;
         return (<>
           <h1>Настройки</h1>
           <p className="hint">Правила салона. Значения по умолчанию взяты из технического задания; меняйте под себя. Каждое изменение сохраняется в историю.</p>
           {msg && <p className={msg[0] ? "msg-ok" : "msg-error"} role="status">{msg[1]}</p>}
           {!pol.persisted && <section className="panel warnbox"><h2>Нужна миграция 0009</h2><p>Пока она не применена, показаны значения по умолчанию и сохранить изменения нельзя.</p></section>}
+          <section className="panel">
+            <h2>Профиль мастера</h2>
+            <p className="hint">Как ассистент и тексты называют вас и вашу студию. Меняется здесь, а не в программе.</p>
+            <form action={saveTenantProfile} className="sched-set">
+              <label className="field"><span>Имя мастера (как к вам обращаются клиенты)</span><input name="masterName" defaultValue={prof.masterName} required maxLength={40} /></label>
+              <label className="field"><span>Имя латиницей (для английских текстов)</span><input name="masterNameLatin" defaultValue={prof.masterNameLatin} maxLength={40} /></label>
+              <label className="field"><span>Название студии</span><input name="studioName" defaultValue={prof.studioName} maxLength={80} /></label>
+              <label className="field"><span>Город</span><input name="city" defaultValue={prof.city} maxLength={60} /></label>
+              <label className="field"><span>Обращение к клиенту</span><select name="addressForm" defaultValue={prof.addressForm}><option value="vy">на «вы»</option><option value="ty">на «ты»</option></select></label>
+              <label className="field"><span>Тон общения</span><select name="tone" defaultValue={prof.tone}>{Object.entries(TONES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+              <label className="field"><span>О вас в нескольких словах (чем вы отличаетесь, что для вас важно; ассистент опирается на это)</span><textarea name="about" defaultValue={prof.about} maxLength={600} rows={4} /></label>
+              <details><summary>Имя в падежах (если программа склонила неверно)</summary>
+                <label className="field"><span>Родительный (нет кого?)</span><input name="form_gen" defaultValue={prof.forms.gen ?? ""} maxLength={40} /></label>
+                <label className="field"><span>Дательный (сказать кому?)</span><input name="form_dat" defaultValue={prof.forms.dat ?? ""} maxLength={40} /></label>
+                <label className="field"><span>Винительный (вижу кого?)</span><input name="form_acc" defaultValue={prof.forms.acc ?? ""} maxLength={40} /></label>
+                <label className="field"><span>Творительный (доволен кем?)</span><input name="form_ins" defaultValue={prof.forms.ins ?? ""} maxLength={40} /></label>
+              </details>
+              <div className="row"><button className="btn btn-primary" type="submit">Сохранить профиль</button></div>
+            </form>
+          </section>
           <section className="panel">
             <h2>Отмены, напоминания, повторные визиты</h2>
             <form action={savePolicies} className="sched-set">

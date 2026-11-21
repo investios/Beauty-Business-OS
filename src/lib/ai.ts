@@ -10,6 +10,7 @@ import { formatLocal } from "./tz";
 import { hasPrefs, parseTimePrefs, slotMatches } from "./timeprefs";
 import { matchArticle } from "./library";
 import { CANCEL_RE, RESCHEDULE_RE, handleChangeRequest, parseManageRef, type PendingView } from "./ai-actions";
+import { fillProfile, getProfile, profileVars } from "./tenant-profile";
 import { runLlm, lastLlmError, lastModel, buildSystemPrompt, answerIsSafe, HANDOFF_TOKEN, type ChatMsg } from "./llm";
 
 export type Locale = "en" | "ru" | "uk";
@@ -74,9 +75,9 @@ export function classify(text: string): Intent[] {
 /* ---------- тексты интерфейса диалога (не факты о мастере) ---------- */
 const T = {
   disclosure: {
-    en: "Hello! I'm the AI consultant of Mila's studio: your hair expert on extensions, hair health and recovery. I answer from knowledge approved by Mila and based on reliable medical sources, so ask me anything. I can suggest a solution, show real free times, and pass anything complex to Mila. I am not a doctor, so I cannot diagnose.",
-    ru: "Здравствуйте! Я ИИ-консультант студии Милы: ваш эксперт по наращиванию, здоровью и восстановлению волос. Отвечаю по знаниям, которые утвердила Мила и которые опираются на проверенные медицинские источники, поэтому спрашивайте о чём угодно. Подскажу решение, покажу реальное свободное время, а сложное передам Миле. Я не врач и диагнозов не ставлю.",
-    uk: "Вітаю! Я ШІ-консультант студії Міли: ваш експерт з нарощування, здоров'я та відновлення волосся. Відповідаю за знаннями, які затвердила Міла і які спираються на перевірені медичні джерела, тож питайте про що завгодно. Підкажу рішення, покажу реальний вільний час, а складне передам Мілі. Я не лікар і діагнозів не ставлю.",
+    en: "Hello! I'm the AI consultant of {master}'s studio: your hair expert on extensions, hair health and recovery. I answer from knowledge approved by {master} and based on reliable medical sources, so ask me anything. I can suggest a solution, show real free times, and pass anything complex to {master}. I am not a doctor, so I cannot diagnose.",
+    ru: "Здравствуйте! Я ИИ-консультант студии {master_gen}: ваш эксперт по наращиванию, здоровью и восстановлению волос. Отвечаю по знаниям, которые утвердила {master} и которые опираются на проверенные медицинские источники, поэтому спрашивайте о чём угодно. Подскажу решение, покажу реальное свободное время, а сложное передам {master_dat}. Я не врач и диагнозов не ставлю.",
+    uk: "Вітаю! Я ШІ-консультант студії {master_gen}: ваш експерт з нарощування, здоров'я та відновлення волосся. Відповідаю за знаннями, які затвердила {master} і які спираються на перевірені медичні джерела, тож питайте про що завгодно. Підкажу рішення, покажу реальний вільний час, а складне передам {master_dat}. Я не лікар і діагнозів не ставлю.",
   },
   slotsIntro: { en: "Here are the nearest free times:", ru: "Вот ближайшее свободное время:", uk: "Ось найближчий вільний час:" },
   slotsNoMatch: { en: "I have nothing free at exactly that time.", ru: "На это время свободного места нет.", uk: "На цей час вільного місця немає." },
@@ -132,7 +133,7 @@ export async function startConversation(db: Db, p: { tenantId: string; locale: L
   const convId = uuid();
   await db.run("INSERT INTO conversations(id,tenant_id,locale,channel,source,created_at) VALUES (?1,?2,?3,?4,?5,?6)", [convId, p.tenantId, p.locale, p.channel ?? "website", js(p.source ?? {}), nowIso()]);
   const c = { id: convId };
-  const text = T.disclosure[p.locale];
+  const text = fillProfile(T.disclosure[p.locale], profileVars(await getProfile(db, p.tenantId), p.locale));
   await db.run("INSERT INTO messages(id,conversation_id,role,content,knowledge_version,meta,created_at) VALUES (?1,?2,'assistant',?3,?4,?5,?6)", [uuid(), c.id, text, kb.version, js({ kind: "disclosure" }), nowIso()]);
   return { conversationId: c.id, message: text };
 }
@@ -208,7 +209,7 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
   const llmEligible = intents.every((i) => ["unknown", "extensions", "technique", "preparation"].includes(i));
   if (llmEligible) {
     const hist = await rows<{ role: string; content: string }>(db, "SELECT role,content FROM messages WHERE conversation_id=?1 AND COALESCE(json_extract(meta,'$.kind'),'') <> 'disclosure' ORDER BY rowid DESC LIMIT 8", [conv.id]);
-    const msgs: ChatMsg[] = [{ role: "system", content: buildSystemPrompt(locale, kbv.snapshot, kbv.version) }, ...hist.reverse().map((m) => ({ role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant", content: m.content }))];
+    const msgs: ChatMsg[] = [{ role: "system", content: buildSystemPrompt(locale, kbv.snapshot, kbv.version, await getProfile(db, p.tenantId)) }, ...hist.reverse().map((m) => ({ role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant", content: m.content }))];
     const out = await (p.llm ?? runLlm)(msgs);
     if (out && !out.includes(HANDOFF_TOKEN) && answerIsSafe(out)) llmText = out.slice(0, 1200);
     tools.push({ tool: "llm", ok: !!llmText, detail: llmText ? "answered " + lastModel : out ? "refused_or_unsafe" : "unavailable: " + lastLlmError });

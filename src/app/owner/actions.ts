@@ -369,3 +369,11 @@ export async function decidePlaybook(fd: FormData) {
   revalidatePath("/owner/scripts");
   redirect("/owner/scripts?m=ok");
 }
+
+export async function saveTenantProfile(fd: FormData) {
+  const { tenantId, db } = await guard();
+  const { saveProfile } = await import("@/lib/tenant-profile");
+  const r = await saveProfile(db, tenantId, Object.fromEntries(fd.entries()));
+  revalidatePath("/owner/settings"); revalidatePath("/owner/scripts");
+  redirect(`/owner/settings?m=${r.ok ? "profile" : r.reason === "migration" ? "profile_migration" : "profile_bad"}`);
+}
