@@ -42,8 +42,7 @@ export default async function Schedule({ searchParams }: { searchParams: Promise
               {DAYS.map(([wd, name]) => {
                 const r = rules.filter((x) => String(x.weekday) === wd);
                 return (
-                  <fieldset key={wd} className="sched-row">
-                    <legend className="sr-only">{name}</legend>
+                  <fieldset key={wd} className="sched-row" aria-label={name}>
                     <label className="check"><input type="checkbox" name={`on${wd}`} value="1" defaultChecked={r.length > 0} /><span><b>{name}</b></span></label>
                     <div className="sched-times">
                       {[0, 1].map((i) => (

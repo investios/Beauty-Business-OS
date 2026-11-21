@@ -129,7 +129,7 @@ export default function BookingFlow({ locale, d, services, initialSlug, mode = "
     setBusy(true); setErr("");
     try {
       const r = await fetch(api(`bookings/${manage.id}/reschedule?token=${encodeURIComponent(manage.token)}`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ startsAtUtc: slot.startUtc }) });
-      if (r.ok) setMoved(true); else setErr(d.errTaken);
+      if (r.ok) setMoved(true); else { const j = await r.json().catch(() => null); setErr(r.status === 409 && j?.error?.code === "too_late" ? d.errLate : d.errTaken); }
     } catch { setErr(d.errGeneric); }
     setBusy(false);
   }

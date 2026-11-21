@@ -16,7 +16,7 @@ export default async function AiPage({ searchParams }: { searchParams: Promise<{
         const db = await getDb();
         const vr = await vipRequests(db, t.id);
         const busy = (await getPolicies(db, t.id)).values.master_busy === 1;
-        const hs = await rows<{ id: string; reason: string; summary: string; contact: string | null; status: string; created_at: string }>(db, "SELECT id,reason,summary,contact,status,created_at FROM handoffs WHERE tenant_id=?1 ORDER BY (status='open') DESC, created_at DESC LIMIT 30", [t.id]);
+        const hs = await rows<{ id: string; reason: string; summary: string; contact: string | null; status: string; created_at: string; channel: string | null }>(db, "SELECT id,reason,summary,contact,status,created_at,(SELECT channel FROM conversations c WHERE c.id=handoffs.conversation_id) channel FROM handoffs WHERE tenant_id=?1 ORDER BY (status='open') DESC, created_at DESC LIMIT 30", [t.id]);
         const arts = await rows<{ id: string; key: string; locale: string; title: string; answer: string; draft_answer: string | null; approved_by: string | null }>(db, "SELECT id,key,locale,title,answer,draft_answer,approved_by FROM knowledge_articles WHERE tenant_id=?1 ORDER BY key, locale", [t.id]);
         const vs = await rows<{ version: number; approved_by: string; active: boolean; created_at: string }>(db, "SELECT version,approved_by,active,created_at FROM knowledge_versions WHERE tenant_id=?1 ORDER BY version DESC", [t.id]);
         const keys = [...new Set(arts.map((a) => a.key))];
@@ -33,7 +33,8 @@ export default async function AiPage({ searchParams }: { searchParams: Promise<{
                 <div className="top"><span>{REASON[h.reason] ?? h.reason}</span><span className={`badge ${h.status === "open" ? "warn" : "ok"}`}>{h.status === "open" ? "ждёт ответа" : "закрыто"}</span></div>
                 <small>{h.summary}</small>
                 <small>Контакт: {h.contact ?? "клиент пока не оставил"} · {formatLocal(new Date(h.created_at).getTime(), "ru")}</small>
-                {h.status === "open" && <form action={replyHandoff} className="sched-set"><input type="hidden" name="id" value={h.id} /><label className="field"><span>Ответ клиенту в чат</span><textarea name="text" rows={2} maxLength={1500} required /></label><div className="row"><button className="btn btn-primary btn-sm" type="submit">Отправить ответ</button></div></form>}
+                {h.status === "open" && h.channel === "manage" && <small className="hint">Клиент написал со страницы записи, чата у него нет: ответьте по контакту выше (почта или телефон), затем отметьте вопрос решённым.</small>}
+                {h.status === "open" && h.channel !== "manage" && <form action={replyHandoff} className="sched-set"><input type="hidden" name="id" value={h.id} /><label className="field"><span>Ответ клиенту в чат</span><textarea name="text" rows={2} maxLength={1500} required /></label><div className="row"><button className="btn btn-primary btn-sm" type="submit">Отправить ответ</button></div></form>}
                 {h.status === "open" && <form action={resolveHandoff}><input type="hidden" name="id" value={h.id} /><button className="btn btn-secondary btn-sm" type="submit">Отметить как решённый</button></form>}
               </div>))}</div>
           </section>

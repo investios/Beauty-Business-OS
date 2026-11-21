@@ -6,6 +6,7 @@ import { BookingError, cancelBooking, createBooking, getAvailability, getBooking
 import { handleMessage, startConversation } from "@/lib/ai";
 import { clientIp, rateLimit } from "@/lib/ratelimit";
 import { formatLocal } from "@/lib/tz";
+import { lateChangeHandoff } from "@/lib/late-change";
 
 type Ctx = { params: Promise<{ tenant: string; path: string[] }> };
 const loc = z.enum(["en", "ru", "uk"]);
@@ -65,10 +66,14 @@ async function route(req: Request, ctx: Ctx, method: "GET" | "POST") {
         const svc = await one<{ title_i18n: Record<string, string>; duration_min: number }>(db, "SELECT title_i18n,duration_min FROM services WHERE id=?1", [a.service_id]);
         return json({ id: a.id, status: a.status, startsAtUtc: new Date(a.start_at).toISOString(), endsAtUtc: new Date(a.end_at).toISOString(), serviceId: a.service_id, service: svc?.title_i18n, timezone: tenant.timezone });
       }
-      if (method === "POST" && m[2] === "cancel") return json(await cancelBooking(db, tenant.id, id, token));
+      if (method === "POST" && m[2] === "cancel") {
+        try { return json(await cancelBooking(db, tenant.id, id, token)); }
+        catch (e) { if (e instanceof BookingError && e.code === "too_late") await lateChangeHandoff(db, tenant.id, id, "cancel"); throw e; }
+      }
       if (method === "POST" && m[2] === "reschedule") {
         const b = z.object({ startsAtUtc: z.string().datetime() }).parse(await req.json());
-        return json(await rescheduleBooking(db, { tenantId: tenant.id, id, token, newStartUtc: b.startsAtUtc }));
+        try { return json(await rescheduleBooking(db, { tenantId: tenant.id, id, token, newStartUtc: b.startsAtUtc })); }
+        catch (e) { if (e instanceof BookingError && e.code === "too_late") await lateChangeHandoff(db, tenant.id, id, "reschedule"); throw e; }
       }
     }
     if (method === "POST" && seg === "ai/conversations") {

@@ -76,6 +76,7 @@ const dict = {
   manageLink: { en: "Your personal link to change or cancel", ru: "Ваша личная ссылка для переноса или отмены", uk: "Ваше особисте посилання для перенесення або скасування" },
   errTaken: { en: "This time was just taken. Please choose another one", ru: "Это время только что заняли. Выберите другое", uk: "Цей час щойно зайняли. Оберіть інший" },
   errGeneric: { en: "We could not save the booking. Nothing was booked. Please try again", ru: "Не удалось сохранить запись. Ничего не забронировано. Попробуйте ещё раз", uk: "Не вдалося зберегти запис. Нічого не заброньовано. Спробуйте ще раз" },
+  errLate: { en: "This visit is too close to change online. We have passed your request to the specialist and she will contact you. Your booking has not been changed", ru: "До визита осталось слишком мало времени, чтобы изменить запись онлайн. Мы передали вашу просьбу мастеру, она свяжется с вами. Ваша запись пока не изменена", uk: "До візиту лишилося надто мало часу, щоб змінити запис онлайн. Ми передали ваше прохання майстру, вона зв'яжеться з вами. Ваш запис поки не змінено" },
   errInvalid: { en: "Please check your name and contact", ru: "Проверьте имя и контакт", uk: "Перевірте ім'я та контакт" },
   // chat
   chatTitle: { en: "Consultation", ru: "Консультация", uk: "Консультація" },
