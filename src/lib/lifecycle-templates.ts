@@ -37,7 +37,7 @@ const T_: Record<MsgKind, Record<Loc, T>> = {
     uk: { subject: "Чекаємо на вас за годину: {when}", body: "Вітаємо, {name}! Нагадуємо: «{service}», {when}. Якщо запізнюєтесь, повідомте за посиланням: {manageUrl}\n\n{salon}" },
   },
   followup: {
-    ru: { subject: "Как ваши ощущения после визита?", body: "Здравствуйте, {name}!\n\nСпасибо, что были у нас. Как ваши ощущения после визита? Ответьте на это письмо цифрой: 1 — всё хорошо; 2 — есть вопрос по уходу; 3 — что-то беспокоит. Мы поможем разобраться.\n\n{salon}" },
+    ru: { subject: "Как ваши ощущения после визита?", body: "Здравствуйте, {name}!\n\nСпасибо, что были у нас. Как вы себя чувствуете после визита? Ответьте на это письмо цифрой: 1 — всё отлично; 2 — есть вопрос по уходу; 3 — что-то беспокоит. На 2 и 3 мы ответим по существу и поможем разобраться.\n\n{salon}" },
     en: { subject: "How have things felt since your visit?", body: "Hello {name},\n\nThank you for visiting. How have things felt since your appointment? Just reply to this email with a number: 1 — all good; 2 — I have a care question; 3 — something is bothering me. We'll make sure you have the support you need.\n\n{salon}" },
     uk: { subject: "Як ваші відчуття після візиту?", body: "Вітаємо, {name}!\n\nДякуємо, що були у нас. Як ваші відчуття після візиту? Дайте відповідь на цей лист цифрою: 1 — усе добре; 2 — є запитання щодо догляду; 3 — щось турбує. Допоможемо розібратися.\n\n{salon}" },
   },
