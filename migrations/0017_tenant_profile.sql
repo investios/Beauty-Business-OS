@@ -9,8 +9,9 @@ CREATE TABLE IF NOT EXISTS tenant_profile (
   tone TEXT NOT NULL DEFAULT 'warm',
   forms TEXT NOT NULL DEFAULT '{}',
   about TEXT NOT NULL DEFAULT '',
+  reference_pack TEXT NOT NULL DEFAULT '',
   updated_at TEXT NOT NULL
 );
 -- Уже существующим салонам (сейчас это студия Милы) ставим её значения. Повторный запуск безопасен.
-INSERT OR IGNORE INTO tenant_profile(tenant_id,master_name,master_name_latin,studio_name,city,updated_at)
-SELECT id,'Мила','Mila','MK Extension Studio by Mila','Дублин',strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM tenants;
+INSERT OR IGNORE INTO tenant_profile(tenant_id,master_name,master_name_latin,studio_name,city,reference_pack,updated_at)
+SELECT id,'Мила','Mila','MK Extension Studio by Mila','Дублин','mk-extension-studio',strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM tenants;

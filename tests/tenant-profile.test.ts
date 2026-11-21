@@ -46,7 +46,7 @@ describe("профиль мастера", () => {
     expect(s).not.toMatch(/Мил|Mila|Міл/);
     const tokens = new Set(s.match(/\{[a-z_]+\}/g));
     for (const t of tokens) expect(["{master}", "{master_gen}", "{master_dat}", "{master_acc}", "{master_ins}"]).toContain(t);
-    const v = profileVars({ masterName: "Анна", masterNameLatin: "Anna", studioName: "", city: "", addressForm: "vy", tone: "warm", forms: {}, about: "", configured: true }, "ru");
+    const v = profileVars({ masterName: "Анна", masterNameLatin: "Anna", studioName: "", city: "", addressForm: "vy", tone: "warm", forms: {}, about: "", referencePack: "", configured: true }, "ru");
     expect(fillProfile(s, v)).not.toMatch(/\{master/);
   });
 });

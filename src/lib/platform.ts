@@ -1,6 +1,7 @@
 import { audit, nowIso, rows, one, type Db } from "./db";
 import { compute } from "./consulting";
 import { POLICY_DEFS, POLICY_KEYS, getPolicies } from "./policies";
+import { evalResults } from "./consultant-eval";
 
 /** Панель владельца платформы: полный доступ ко всем данным салона для анализа.
  *  Здесь, в отличие от консультанта, есть тексты диалогов, жалобы и ответы мастера. Каждый просмотр и выгрузка пишутся в журнал. */
@@ -87,11 +88,11 @@ export async function accessLog(db: Db, limit = 100) {
 export async function fullReport(db: Db, tenantId: string, days = 90) {
   const t = await one<TenantRow>(db, "SELECT id,name,slug,is_demo,created_at FROM tenants WHERE id=?1", [tenantId]);
   if (!t) return null;
-  const [aggregates, tr, services, complaints, ai, settings, jobs] = await Promise.all([
+  const [aggregates, tr, services, complaints, ai, settings, jobs, evals] = await Promise.all([
     compute(db, tenantId, Date.now(), days), transcripts(db, tenantId, days, 1000), serviceStats(db, tenantId, days), complaintRows(db, tenantId, days),
-    aiUsage(db, tenantId, days), tenantSettings(db, tenantId), jobsSummary(db, tenantId),
+    aiUsage(db, tenantId, days), tenantSettings(db, tenantId), jobsSummary(db, tenantId), evalResults(db, tenantId, 500),
   ]);
-  return { generatedAt: nowIso(), periodDays: days, tenant: { id: t.id, name: t.name, slug: t.slug }, aggregates, aiUsage: ai, services, complaints, settings, jobs, conversations: tr };
+  return { generatedAt: nowIso(), periodDays: days, tenant: { id: t.id, name: t.name, slug: t.slug }, aggregates, aiUsage: ai, services, complaints, settings, jobs, consultantEval: evals, conversations: tr };
 }
 
 const q = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""').replace(/\r?\n/g, " ")}"`;

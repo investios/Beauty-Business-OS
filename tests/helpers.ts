@@ -1,7 +1,7 @@
 import { createSqlite } from "@/lib/db";
 import { createTenant } from "@/lib/seed";
 import { listServices } from "@/lib/booking";
-import { saveProfile } from "@/lib/tenant-profile";
+import { saveProfile, setReferencePack } from "@/lib/tenant-profile";
 
 export const NOW = new Date("2026-11-09T08:00:00Z");
 
@@ -10,6 +10,7 @@ export async function setup() {
   const tenantId = await createTenant(db, { slug: "a", name: "A" });
   const tenantB = await createTenant(db, { slug: "b", name: "B" });
   await saveProfile(db, tenantId, { masterName: "Мила", masterNameLatin: "Mila", studioName: "MK Extension Studio by Mila", city: "Дублин" }, "test");
+  await setReferencePack(db, tenantId, "mk-extension-studio", "test");
   const services = await listServices(db, tenantId);
   const consult = services.find((s) => s.slug === "consultation")!;
   return { db, tenantId, tenantB, consult, services };

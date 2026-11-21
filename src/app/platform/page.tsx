@@ -4,15 +4,17 @@ import { getDb } from "@/lib/db";
 import { compute } from "@/lib/consulting";
 import { accessLog, aiUsage, complaintRows, jobsSummary, listTenants, logAccess, serviceStats, tenantSettings, transcripts } from "@/lib/platform";
 import { formatLocal } from "@/lib/tz";
+import { runConsultantEval } from "./actions";
+import { EVAL_BATCH, EVAL_CASES, evalResults } from "@/lib/consultant-eval";
 import PlatformLogout from "./Logout";
 export const dynamic = "force-dynamic";
 
-const TABS = [["overview", "Обзор"], ["dialogs", "Диалоги"], ["problems", "Жалобы и передачи"], ["services", "Услуги"], ["ai", "ИИ"], ["settings", "Настройки и задачи"], ["access", "Журнал доступа"]] as const;
+const TABS = [["overview", "Обзор"], ["dialogs", "Диалоги"], ["problems", "Жалобы и передачи"], ["services", "Услуги"], ["ai", "ИИ"], ["eval", "Проверка консультанта"], ["settings", "Настройки и задачи"], ["access", "Журнал доступа"]] as const;
 const pct = (v: number | null) => (v === null ? "—" : `${v}%`);
 const fmt = (iso: string) => formatLocal(new Date(iso).getTime(), "ru");
 const title = (j: string) => { try { return (JSON.parse(j) as Record<string, string>).ru ?? j; } catch { return j; } };
 
-export default async function Platform({ searchParams }: { searchParams: Promise<{ t?: string; tab?: string; days?: string }> }) {
+export default async function Platform({ searchParams }: { searchParams: Promise<{ t?: string; tab?: string; days?: string; m?: string }> }) {
   if (!(await platformAuthorized())) redirect("/platform/login");
   const sp = await searchParams;
   const db = await getDb();
@@ -51,6 +53,7 @@ export default async function Platform({ searchParams }: { searchParams: Promise
         {tab === "problems" && <Problems db={db} id={t.id} days={days} />}
         {tab === "services" && <Services db={db} id={t.id} days={days} />}
         {tab === "ai" && <Ai db={db} id={t.id} days={days} />}
+        {tab === "eval" && <Eval db={db} id={t.id} days={days} m={sp.m} />}
         {tab === "settings" && <Settings db={db} id={t.id} />}
         {tab === "access" && <Access db={db} />}
       </main>
@@ -58,7 +61,7 @@ export default async function Platform({ searchParams }: { searchParams: Promise
   );
 }
 
-type P = { db: Awaited<ReturnType<typeof getDb>>; id: string; days?: number };
+type P = { db: Awaited<ReturnType<typeof getDb>>; id: string; days?: number; m?: string };
 
 async function Overview({ db, id, days }: P) {
   const a = await compute(db, id, Date.now(), days);
@@ -156,4 +159,39 @@ async function Settings({ db, id }: P) {
 async function Access({ db }: { db: P["db"] }) {
   const l = await accessLog(db, 100);
   return <section className="panel"><h2>Журнал доступа платформы</h2><ul className="plain">{l.map((x, i) => <li key={i}>{fmt(x.at)} · {x.action}{x.target ? ` · ${x.target}` : ""}</li>)}</ul></section>;
+}
+
+async function Eval({ db, id, days, m }: P) {
+  const all = await evalResults(db, id, 300);
+  const latestRun = all[0]?.run_id;
+  const runs = [...new Set(all.map((x) => x.run_id))].slice(0, 6);
+  const shown = all.filter((x) => x.run_id === latestRun).sort((a, b) => a.case_id.localeCompare(b.case_id));
+  const nb = Math.ceil(EVAL_CASES.length / EVAL_BATCH);
+  return (
+    <>
+      <section className="panel"><h2>Проверка консультанта на живых вопросах</h2>
+        <p className="hint">{EVAL_CASES.length} вопросов, как их пишут клиенты: цена, возражения, подбор, знания, здоровье, запись, жалоба, попытки обойти правила. Вопросы идут настоящей модели и настоящим знаниям этого салона. Клиентских диалогов и передач мастеру не создаётся. Из рабочей среды разработчика до модели дотянуться нельзя, поэтому запускаете вы: по кнопке, частями по {EVAL_BATCH} вопросов.</p>
+        {m?.startsWith("ran") && <p className="msg-ok" role="status">Часть {m.slice(3)} готова, результаты ниже.</p>}
+        <form action={runConsultantEval} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input type="hidden" name="t" value={id} /><input type="hidden" name="days" value={days} />
+          {Array.from({ length: nb }, (_, i) => <button key={i} className="btn" name="batch" value={i} type="submit">Запустить часть {i + 1} из {nb}</button>)}
+        </form>
+      </section>
+      <section className="panel"><h2>Последний прогон</h2>
+        {shown.length === 0 ? <p>Прогонов ещё не было.</p> : (
+          <>
+            <p className="hint">Пометки ставит код, оценку качества даёте вы. Пометка «передача мастеру» для вопросов вне знаний нормальна. «ЗАБЛОКИРОВАНО защитой» значит, что модель написала запрещённое (цену, скидку, гарантию), клиент такого не увидит.</p>
+            {shown.map((x) => (
+              <details key={x.case_id} style={{ marginBottom: 10 }}>
+                <summary><b style={{ whiteSpace: "nowrap" }}>{x.case_id}</b> {x.question}{x.flags ? ` · ⚑ ${x.flags}` : ""}</summary>
+                <p className="hint" style={{ margin: "6px 0" }}>{x.route}{x.model ? ` · ${x.model}` : ""}</p>
+                <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{x.answer || "—"}</div>
+              </details>
+            ))}
+          </>
+        )}
+        {runs.length > 1 && <p className="hint">Прошлые прогоны сохранены и входят в полный отчёт (JSON).</p>}
+      </section>
+    </>
+  );
 }

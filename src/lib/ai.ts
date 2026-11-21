@@ -14,7 +14,7 @@ import { fillProfile, getProfile, profileVars } from "./tenant-profile";
 import { runLlm, lastLlmError, lastModel, buildSystemPrompt, answerIsSafe, HANDOFF_TOKEN, type ChatMsg } from "./llm";
 
 export type Locale = "en" | "ru" | "uk";
-export type Intent = "medical" | "human" | "booking" | "price" | "technique" | "extensions" | "consultation" | "preparation" | "greeting" | "contact" | "education" | "unknown";
+export type Intent = "medical" | "human" | "booking" | "price" | "technique" | "extensions" | "consultation" | "preparation" | "greeting" | "contact" | "education" | "objection" | "complaint" | "ack" | "unknown";
 
 export type AiReply = {
   message: string; locale: Locale; intent: Intent; knowledgeVersion: number | null; citations: string[];
@@ -53,12 +53,18 @@ const EXT = /(наращ|нарощ|extension|extend|hair length|удлин)/i;
 const CONSULT = /(консульт|consult)/i;
 const PREP = /(подготов|підготов|prepar|before (?:the )?(?:visit|appointment))/i;
 const GREET = /^\s*(привет|здравств|добрый|привіт|вітаю|добрий|hello|hi|hey|good (?:morning|afternoon|evening))\b/i;
+const COMPLAINT = /(не понравил|не устраива|плохо держ|держится плох|отвалива|выпал[аи]?\s+капсул|испортил|жалоб|недоволь|разочаров|претензи|disappoint|complain|unhappy|not happy|bad result|ruined|не сподобал|скарг|незадоволен)/i;
+const OBJECTION = /(дорог|не по карман|подума|сомнева|не уверен|дешевле|боюсь|страшно|expensive|too much|think about it|cheaper|afraid|worried|not sure|дешевш|боюся|не впевнен)/i;
+const ACK = /^\s*(ок|окей|okay|ok|спасибо|благодарю|понятно|ясно|thanks|thank you|thx|дякую|зрозуміло)\W*$/i;
 const CONTACT_RE = /([^\s@]+@[^\s@]+\.[^\s@]{2,})|(\+?\d[\d\s()-]{7,18}\d)/;
 
 export function classify(text: string): Intent[] {
   const out: Intent[] = [];
   if (MEDICAL.test(text)) return ["medical"];            // безопасность выше всего
   if (HUMAN.test(text)) return ["human"];
+  if (COMPLAINT.test(text)) return ["complaint"];          // недовольство: никаких продаж
+  if (ACK.test(text)) return ["ack"];
+  if (OBJECTION.test(text)) out.push("objection");
   if (EDU.test(text)) out.push("education");
   if (PRICE.test(text)) out.push("price");
   if (BOOKING.test(text)) out.push("booking");
@@ -78,6 +84,32 @@ const T = {
     en: "Hello! I'm the AI consultant of {master}'s studio: your hair expert on extensions, hair health and recovery. I answer from knowledge approved by {master} and based on reliable medical sources, so ask me anything. I can suggest a solution, show real free times, and pass anything complex to {master}. I am not a doctor, so I cannot diagnose.",
     ru: "Здравствуйте! Я ИИ-консультант студии {master_gen}: ваш эксперт по наращиванию, здоровью и восстановлению волос. Отвечаю по знаниям, которые утвердила {master} и которые опираются на проверенные медицинские источники, поэтому спрашивайте о чём угодно. Подскажу решение, покажу реальное свободное время, а сложное передам {master_dat}. Я не врач и диагнозов не ставлю.",
     uk: "Вітаю! Я ШІ-консультант студії {master_gen}: ваш експерт з нарощування, здоров'я та відновлення волосся. Відповідаю за знаннями, які затвердила {master} і які спираються на перевірені медичні джерела, тож питайте про що завгодно. Підкажу рішення, покажу реальний вільний час, а складне передам {master_dat}. Я не лікар і діагнозів не ставлю.",
+  },
+  complaint: {
+    en: "I'm sorry the result isn't what you expected, and thank you for telling us. I've passed this to the specialist so it gets looked at personally. Please tell me when the procedure was done and what exactly is wrong, and leave a phone number or email so they can reach you.",
+    ru: "Мне жаль, что результат не оправдал ожиданий, и спасибо, что написали. Я передал это мастеру, чтобы разобрались лично. Расскажите, когда была процедура и что именно не так, и оставьте телефон или почту, чтобы с вами связались.",
+    uk: "Мені шкода, що результат не виправдав очікувань, і дякую, що написали. Я передав це майстру, щоб розібралися особисто. Розкажіть, коли була процедура і що саме не так, і залиште телефон або пошту, щоб із вами зв'язалися.",
+  },
+  ack: { en: "Alright. If any questions come up, just write.", ru: "Хорошо. Если появятся вопросы, пишите.", uk: "Добре. Якщо з'являться питання, пишіть." },
+  objExpensive: {
+    en: "I understand, it's an important decision. What worries you more: the total amount, or whether the result will be worth it? The specialist can explain at a consultation what the price is made of and suggest an option for your goals, and you decide calmly.",
+    ru: "Понимаю, это важное решение. Что смущает больше: общая сумма или сомнение, что результат оправдает вложение? На консультации мастер объяснит, из чего складывается стоимость, и подберёт вариант под ваши цели, а вы решите спокойно.",
+    uk: "Розумію, це важливе рішення. Що непокоїть більше: загальна сума чи сумнів, що результат виправдає вкладення? На консультації майстер пояснить, з чого складається вартість, і підбере варіант під ваші цілі, а ви вирішите спокійно.",
+  },
+  objThink: {
+    en: "Of course, a decision like this shouldn't be rushed. If you have questions about care or what's safe for your hair, write and I'll answer. When you're ready, we'll find a time.",
+    ru: "Конечно, такое решение лучше не принимать в спешке. Если появятся вопросы про уход или безопасность для ваших волос, пишите, отвечу. Когда будете готовы, подберём время.",
+    uk: "Звісно, таке рішення краще не ухвалювати нашвидкуруч. Якщо з'являться питання про догляд чи безпеку для вашого волосся, пишіть, відповім. Коли будете готові, підберемо час.",
+  },
+  objCheaper: {
+    en: "Comparing is perfectly normal. The price of extensions depends on the material, the number of bonds and how it's matched to your hair, so it's worth comparing like with like. Would you like me to tell you what to look at for a fair comparison?",
+    ru: "Сравнивать нормально. Цена наращивания зависит от материала, количества капсул и того, как подобрано под ваши волосы, поэтому важно сравнивать одно с одним. Рассказать, на что смотреть, чтобы сравнение было честным?",
+    uk: "Порівнювати нормально. Ціна нарощування залежить від матеріалу, кількості капсул і того, як підібрано під ваше волосся, тому важливо порівнювати одне з одним. Розповісти, на що дивитися, щоб порівняння було чесним?",
+  },
+  objFear: {
+    en: "That worry is reasonable: any method puts some load on your own hair, and a lot depends on how it's matched, the weight and the care. That's why the specialist first looks at your hair and tells you honestly whether extensions suit you. What are your hair like now: thin, coloured, anything bothering you?",
+    ru: "Этот страх разумный: у любого метода есть нагрузка на свои волосы, и многое зависит от подбора, веса и ухода. Поэтому мастер сначала смотрит ваши волосы и честно говорит, подходит ли вам наращивание. Какие у вас сейчас волосы: тонкие, окрашенные, что-то уже беспокоит?",
+    uk: "Цей страх розумний: у будь-якого методу є навантаження на власне волосся, і багато що залежить від підбору, ваги та догляду. Тому майстер спершу дивиться ваше волосся і чесно каже, чи підходить вам нарощування. Яке у вас волосся зараз: тонке, фарбоване, щось уже турбує?",
   },
   slotsIntro: { en: "Here are the nearest free times:", ru: "Вот ближайшее свободное время:", uk: "Ось найближчий вільний час:" },
   slotsNoMatch: { en: "I have nothing free at exactly that time.", ru: "На это время свободного места нет.", uk: "На цей час вільного місця немає." },
@@ -204,9 +236,44 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
       return { message: msg, locale, intent: "booking", knowledgeVersion: kbv.version, citations, requiresHuman: true, handoffId, toolResults: tools, engine };
     }
   }
+  // Цены из таблицы услуг и реальные слоты календаря: выполняются кодом, а не моделью
+  const priceAndSlots = async () => {
+    if (intents.includes("price")) {
+      // Цены только из таблицы услуг; неподтверждённые не называем
+      const confirmed = (await listServices(db, p.tenantId)).filter((s) => s.price_mode !== "unconfirmed" && s.price_from_cents != null);
+      if (confirmed.length) {
+        parts.push(T.priceConfirmed[locale] + " " + confirmed.map((s) => `${s.title_i18n[locale]}: ${s.price_mode === "from" ? T.priceFrom[locale] + " " : ""}€${(s.price_from_cents! / 100).toFixed(0)}`).join("; "));
+        tools.push({ tool: "getServices", ok: true, detail: `${confirmed.length} confirmed prices` });
+      }
+    }
+    // Слоты — только из реального календаря
+    const wantsSlots = intents.includes("booking") || intents.includes("price") || intents.includes("consultation") || intents.includes("education");
+    if (wantsSlots) {
+      const svc = (await listServices(db, p.tenantId)).find((s) => s.slug === "consultation");
+      if (svc) {
+        const prefs = parseTimePrefs(text, p.now ?? new Date());
+        const all = await getAvailability(db, { tenantId: p.tenantId, serviceId: svc.id, now: p.now, days: 60 });
+        const filtered = hasPrefs(prefs) ? all.filter((s) => slotMatches(new Date(s.startUtc).getTime(), prefs)) : all;
+        // На пожелание нет свободного времени: честно говорим об этом и показываем ближайшее из настоящего календаря
+        const fallback = hasPrefs(prefs) && filtered.length === 0 && all.length > 0;
+        const pick = (fallback ? all : filtered).slice(0, 4);
+        tools.push({ tool: "getAvailability", ok: true, detail: `${pick.length} slots` });
+        if (pick.length && (intents.includes("booking") || intents.includes("consultation") || intents.includes("education"))) {
+          slots = pick.map((s) => ({ startUtc: s.startUtc, label: formatLocal(new Date(s.startUtc).getTime(), locale), serviceId: svc.id }));
+          parts.push((fallback ? T.slotsNoMatch[locale] + " " : "") + T.slotsIntro[locale] + " " + T.slotsPick[locale]);
+        } else if (!pick.length && intents.includes("booking")) {
+          handoffId = await handoff(db, p.tenantId, conv.id, "no_slots", text);
+          requiresHuman = true;
+          parts.push(T.noSlots[locale]);
+        } else if (intents.includes("price")) {
+          parts.push(T.consultQ[locale]); // одно уточнение/предложение, без давления
+        }
+      }
+    }
+  };
   // Вопрос вне сценариев: пробуем модель (Cloudflare Workers AI) по утверждённым знаниям; при отказе, сбое или небезопасном ответе — передача мастеру
   let llmText: string | null = null;
-  const llmEligible = intents.every((i) => ["unknown", "extensions", "technique", "preparation"].includes(i));
+  const llmEligible = intents.every((i) => ["unknown", "extensions", "technique", "preparation", "price", "consultation", "education", "objection"].includes(i));
   if (llmEligible) {
     const hist = await rows<{ role: string; content: string }>(db, "SELECT role,content FROM messages WHERE conversation_id=?1 AND COALESCE(json_extract(meta,'$.kind'),'') <> 'disclosure' ORDER BY rowid DESC LIMIT 8", [conv.id]);
     const msgs: ChatMsg[] = [{ role: "system", content: buildSystemPrompt(locale, kbv.snapshot, kbv.version, await getProfile(db, p.tenantId)) }, ...hist.reverse().map((m) => ({ role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant", content: m.content }))];
@@ -217,6 +284,20 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
   if (llmText) {
     engine = "llm-demo";
     parts.push(llmText);
+    if (intents.some((i) => ["price", "consultation", "education"].includes(i))) await priceAndSlots();
+  } else if (primary === "complaint") {
+    // Недовольство: никаких продаж. Вопрос уходит мастеру; если клиент узнан по ссылке записи, жалоба фиксируется в его карточке.
+    const who = await clientContext(db, p.tenantId, conv.id, p.now);
+    if (who) { const { addComplaint } = await import("./client-model"); await addComplaint(db, p.tenantId, who.clientId, text.slice(0, 1000), "ai"); tools.push({ tool: "addComplaint", ok: true, detail: "recorded" }); }
+    handoffId = await handoff(db, p.tenantId, conv.id, "complaint", text);
+    tools.push({ tool: "requestHandoff", ok: true, detail: handoffId });
+    requiresHuman = true;
+    parts.push(T.complaint[locale]);
+  } else if (primary === "ack") {
+    parts.push(T.ack[locale]);
+  } else if (primary === "objection") {
+    const kind = /(дешевле|cheaper|дешевш)/i.test(text) ? T.objCheaper : /(боюсь|страшно|afraid|worried|боюся)/i.test(text) ? T.objFear : /(подума|think about it|not sure|не уверен|сомнева|не впевнен)/i.test(text) ? T.objThink : T.objExpensive;
+    parts.push(kind[locale]);
   } else if (primary === "medical" || primary === "human" || primary === "unknown") {
     handoffId = await handoff(db, p.tenantId, conv.id, primary === "medical" ? "medical" : primary === "human" ? "client_requested_human" : "out_of_knowledge", text);
     tools.push({ tool: "requestHandoff", ok: true, detail: handoffId });
@@ -255,38 +336,7 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
       const a = article(kbv.snapshot, topic === "extensions" ? "extensions" : topic, locale);
       if (a) { parts.push(a.answer); citations.push(a.key); }
     }
-    if (intents.includes("price")) {
-      // Цены только из таблицы услуг; неподтверждённые не называем
-      const confirmed = (await listServices(db, p.tenantId)).filter((s) => s.price_mode !== "unconfirmed" && s.price_from_cents != null);
-      if (confirmed.length) {
-        parts.push(T.priceConfirmed[locale] + " " + confirmed.map((s) => `${s.title_i18n[locale]}: ${s.price_mode === "from" ? T.priceFrom[locale] + " " : ""}€${(s.price_from_cents! / 100).toFixed(0)}`).join("; "));
-        tools.push({ tool: "getServices", ok: true, detail: `${confirmed.length} confirmed prices` });
-      }
-    }
-    // Слоты — только из реального календаря
-    const wantsSlots = intents.includes("booking") || intents.includes("price") || intents.includes("consultation") || intents.includes("education");
-    if (wantsSlots) {
-      const svc = (await listServices(db, p.tenantId)).find((s) => s.slug === "consultation");
-      if (svc) {
-        const prefs = parseTimePrefs(text, p.now ?? new Date());
-        const all = await getAvailability(db, { tenantId: p.tenantId, serviceId: svc.id, now: p.now, days: 60 });
-        const filtered = hasPrefs(prefs) ? all.filter((s) => slotMatches(new Date(s.startUtc).getTime(), prefs)) : all;
-        // На пожелание нет свободного времени: честно говорим об этом и показываем ближайшее из настоящего календаря
-        const fallback = hasPrefs(prefs) && filtered.length === 0 && all.length > 0;
-        const pick = (fallback ? all : filtered).slice(0, 4);
-        tools.push({ tool: "getAvailability", ok: true, detail: `${pick.length} slots` });
-        if (pick.length && (intents.includes("booking") || intents.includes("consultation") || intents.includes("education"))) {
-          slots = pick.map((s) => ({ startUtc: s.startUtc, label: formatLocal(new Date(s.startUtc).getTime(), locale), serviceId: svc.id }));
-          parts.push((fallback ? T.slotsNoMatch[locale] + " " : "") + T.slotsIntro[locale] + " " + T.slotsPick[locale]);
-        } else if (!pick.length && intents.includes("booking")) {
-          handoffId = await handoff(db, p.tenantId, conv.id, "no_slots", text);
-          requiresHuman = true;
-          parts.push(T.noSlots[locale]);
-        } else if (intents.includes("price")) {
-          parts.push(T.consultQ[locale]); // одно уточнение/предложение, без давления
-        }
-      }
-    }
+    await priceAndSlots();
   }
 
   if (requiresHuman && (await isMasterBusy(db, p.tenantId))) parts.push(T.busy[locale]);

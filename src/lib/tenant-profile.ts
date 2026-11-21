@@ -11,22 +11,22 @@ export const TONES = {
 export type Tone = keyof typeof TONES;
 export type Profile = {
   masterName: string; masterNameLatin: string; studioName: string; city: string;
-  addressForm: "vy" | "ty"; tone: Tone; forms: Partial<Record<"gen" | "dat" | "acc" | "ins", string>>; about: string; configured: boolean;
+  addressForm: "vy" | "ty"; tone: Tone; forms: Partial<Record<"gen" | "dat" | "acc" | "ins", string>>; about: string; referencePack: string; configured: boolean;
 };
 /** Пока профиль не заполнен, тексты говорят нейтрально («мастер»), а не чужим именем */
-export const NEUTRAL: Profile = { masterName: "", masterNameLatin: "", studioName: "", city: "", addressForm: "vy", tone: "warm", forms: {}, about: "", configured: false };
+export const NEUTRAL: Profile = { masterName: "", masterNameLatin: "", studioName: "", city: "", addressForm: "vy", tone: "warm", forms: {}, about: "", referencePack: "", configured: false };
 
 const clean = (v: unknown, max: number) => String(v ?? "").replace(/[<>{}[\]\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 
 export async function getProfile(db: Db, tenantId: string): Promise<Profile> {
   try {
-    const r = await one<{ master_name: string; master_name_latin: string; studio_name: string; city: string; address_form: string; tone: string; forms: string | Record<string, string>; about: string }>(db, "SELECT master_name,master_name_latin,studio_name,city,address_form,tone,forms,about FROM tenant_profile WHERE tenant_id=?1", [tenantId]);
+    const r = await one<{ master_name: string; master_name_latin: string; studio_name: string; city: string; address_form: string; tone: string; forms: string | Record<string, string>; about: string; reference_pack: string }>(db, "SELECT master_name,master_name_latin,studio_name,city,address_form,tone,forms,about,reference_pack FROM tenant_profile WHERE tenant_id=?1", [tenantId]);
     if (!r) return NEUTRAL;
     let forms: Profile["forms"] = {};
     try { forms = typeof r.forms === "string" ? JSON.parse(r.forms || "{}") : (r.forms ?? {}); } catch { /* пусто */ }
     return {
       masterName: r.master_name, masterNameLatin: r.master_name_latin, studioName: r.studio_name, city: r.city,
-      addressForm: r.address_form === "ty" ? "ty" : "vy", tone: (r.tone in TONES ? r.tone : "warm") as Tone, forms, about: r.about, configured: !!r.master_name,
+      addressForm: r.address_form === "ty" ? "ty" : "vy", tone: (r.tone in TONES ? r.tone : "warm") as Tone, forms, about: r.about, referencePack: r.reference_pack ?? "", configured: !!r.master_name,
     };
   } catch { return NEUTRAL; } // таблицы ещё нет (миграция не применена)
 }
@@ -44,6 +44,11 @@ export async function saveProfile(db: Db, tenantId: string, i: Record<string, un
   } catch { return { ok: false, reason: "migration" }; }
   await audit(db, tenantId, by, "profile.save");
   return { ok: true };
+}
+
+/** Какой справочный пакет сведений о студии подключён к салону. Назначает владелец платформы. */
+export async function setReferencePack(db: Db, tenantId: string, id: string, by = "platform"): Promise<boolean> {
+  try { await db.run("UPDATE tenant_profile SET reference_pack=?2, updated_at=?3 WHERE tenant_id=?1", [tenantId, clean(id, 60), nowIso()]); await audit(db, tenantId, by, "profile.reference_pack", clean(id, 60)); return true; } catch { return false; }
 }
 
 const HARD = /[гкхжчшщ]$/i;

@@ -3,7 +3,7 @@ import { buildSystemPrompt } from "@/lib/llm";
 import { clientIp } from "@/lib/ratelimit";
 import type { Profile } from "@/lib/tenant-profile";
 
-const MILA: Profile = { masterName: "Мила", masterNameLatin: "Mila", studioName: "MK Extension Studio by Mila", city: "Дублин", addressForm: "vy", tone: "warm", forms: {}, about: "", configured: true };
+const MILA: Profile = { masterName: "Мила", masterNameLatin: "Mila", studioName: "MK Extension Studio by Mila", city: "Дублин", addressForm: "vy", tone: "warm", forms: {}, about: "", referencePack: "mk-extension-studio", configured: true };
 
 describe("PR-2: знания AI", () => {
   it("утверждённые знания идут отдельным блоком и главнее справочных", () => {
