@@ -2,6 +2,7 @@ import OwnerShell from "@/components/OwnerShell";
 import { getDb, rows } from "@/lib/db";
 import { formatLocal } from "@/lib/tz";
 import { activateVersion, approveDraft, publishVersion, replyHandoff, resolveHandoff, saveDraft, decideVip } from "../actions";
+import { isMasterBusy } from "@/lib/master-state";
 import { getPolicies } from "@/lib/policies";
 import { vipRequests } from "@/lib/loyalty";
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ export default async function AiPage({ searchParams }: { searchParams: Promise<{
       {async (t) => {
         const db = await getDb();
         const vr = await vipRequests(db, t.id);
-        const busy = (await getPolicies(db, t.id)).values.master_busy === 1;
+        const busy = await isMasterBusy(db, t.id);
         const hs = await rows<{ id: string; reason: string; summary: string; contact: string | null; status: string; created_at: string; channel: string | null }>(db, "SELECT id,reason,summary,contact,status,created_at,(SELECT channel FROM conversations c WHERE c.id=handoffs.conversation_id) channel FROM handoffs WHERE tenant_id=?1 ORDER BY (status='open') DESC, created_at DESC LIMIT 30", [t.id]);
         const arts = await rows<{ id: string; key: string; locale: string; title: string; answer: string; draft_answer: string | null; approved_by: string | null }>(db, "SELECT id,key,locale,title,answer,draft_answer,approved_by FROM knowledge_articles WHERE tenant_id=?1 ORDER BY key, locale", [t.id]);
         const vs = await rows<{ version: number; approved_by: string; active: boolean; created_at: string }>(db, "SELECT version,approved_by,active,created_at FROM knowledge_versions WHERE tenant_id=?1 ORDER BY version DESC", [t.id]);

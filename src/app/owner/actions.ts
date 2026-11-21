@@ -351,3 +351,13 @@ export async function decideVip(fd: FormData) {
   revalidatePath("/owner/ai");
   redirect(`/owner/ai?m=${ok ? "vipdone" : "bad"}`);
 }
+
+export async function saveMasterState(fd: FormData) {
+  const { tenantId, db } = await guard();
+  const { setMasterState } = await import("@/lib/master-state");
+  const mins = Number(fd.get("minutes") || 0);
+  const until = mins > 0 && mins <= 720 ? new Date(Date.now() + mins * 60000).toISOString() : null;
+  await setMasterState(db, tenantId, String(fd.get("state") ?? ""), until);
+  revalidatePath("/owner/today"); revalidatePath("/owner/ai");
+  redirect("/owner/today?m=state");
+}

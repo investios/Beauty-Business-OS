@@ -2,6 +2,8 @@ import { nowIso, one, rows, uuid, auditStmt, type Db } from "./db";
 import { deliverEmail } from "./notify";
 import { SITE_URL } from "./seo";
 import { IS_MARKETING, PREVIEW_LINK, render, type MsgKind } from "./lifecycle-templates";
+import { isSuppressed } from "./suppression";
+import { recordDelivery } from "./delivery";
 import { formatLocal, localParts, zonedToUtc, addLocalDays } from "./tz";
 
 /** Сообщения жизненного цикла. По умолчанию ПРОБНЫЙ режим: тексты формируются и сохраняются, наружу ничего не уходит.
@@ -79,12 +81,17 @@ export async function runLifecycle(db: Db, tenantId: string, o: RunOpts): Promis
     const cons = async (p: "service" | "marketing") => !!(await one(db, "SELECT 1 FROM consents WHERE client_id=?1 AND tenant_id=?2 AND purpose=?3 AND withdrawn_at IS NULL LIMIT 1", [c.client_id, tenantId, p]));
     if (!(await cons("service"))) { await finish("cancelled", "skipped", { reason: "no_service_consent" }); continue; }
     if (IS_MARKETING[j.kind] && !(await cons("marketing"))) { await finish("cancelled", "skipped", { reason: "no_marketing_consent" }); continue; }
+    // Открытая жалоба: «как прошла процедура» и «повторный визит» стоят, пока жалоба не решена (служебные напоминания идут)
+    if (!isReminder(j.kind) && (await one(db, "SELECT 1 x FROM complaints WHERE client_id=?1 AND tenant_id=?2 AND status='open' LIMIT 1", [c.client_id, tenantId]).catch(() => null))) { res.waiting++; continue; }
+    if (await isSuppressed(db, tenantId, c.contact, !!IS_MARKETING[j.kind])) { await finish("cancelled", "skipped", { reason: "suppressed" }); await recordDelivery(db, tenantId, j.id, "suppressed"); continue; }
     if (inQuietHours(o.nowMs)) { res.waiting++; continue; } // подождёт утра
     const loc = c.appt_locale || c.preferred_locale || "en";
     const base = { name: c.name, salon: c.salon, service: c.title_i18n?.[loc] ?? c.title_i18n?.en ?? "", when: formatLocal(startMs(c.start_at), loc) };
     if (o.send && process.env.LIFECYCLE_SEND === "1") {
       const m = render(j.kind, loc, { ...base, manageUrl: `${SITE_URL}/${loc}/manage/${j.appointment_id}?token=${c.manage_token}` });
       const st = await deliverEmail(c.contact, m.subject, m.body);
+      if (st === "sent") await recordDelivery(db, tenantId, j.id, "sent");
+      else await recordDelivery(db, tenantId, j.id, "failed");
       if (st === "sent") await finish("sent", "sent", { locale: loc, subject: m.subject, body: render(j.kind, loc, { ...base, manageUrl: PREVIEW_LINK }).body });
       else await finish("failed", "failed", { locale: loc, error: st === "not_configured" ? "provider_not_configured" : "delivery_failed" });
     } else {

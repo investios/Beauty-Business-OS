@@ -4,7 +4,8 @@ import { formatLocal } from "@/lib/tz";
 import { buildBrief } from "@/lib/brief";
 import { jobsReady, recentJobs } from "@/lib/jobs";
 import SpeakButton from "@/components/SpeakButton";
-import { runJobsNow } from "../actions";
+import { runJobsNow, saveMasterState } from "../actions";
+import { getMasterState, MASTER_STATES, STATE_HELP, STATE_LABEL } from "@/lib/master-state";
 import { ACTION_LABEL, actorLabel, APPT_FILTERS, countAppts, listAppts, recentActivity, type ApptFilter } from "@/lib/owner-queries";
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
         const next = await listAppts(db, t.id, "week", now, { limit: 30 });
         const week = kpis.find((k) => k.f === "week")!.n;
         const brief = await buildBrief(db, t.id, now);
+        const ms = await getMasterState(db, t.id, now);
         const jobsOk = await jobsReady(db);
         const jobs = jobsOk ? await recentJobs(db, t.id, 5) : [];
         const o = brief.open;
@@ -38,7 +40,17 @@ export default async function Overview({ searchParams }: { searchParams: Promise
         return (<>
           <h1>Обзор</h1>
           {sp.m === "jobs" && <p className="msg-ok" role="status">Фоновые задачи выполнены: {sp.n}, с ошибкой: {sp.f}.</p>}
+          {sp.m === "state" && <p className="msg-ok" role="status">Состояние сохранено.</p>}
           {sp.m === "jobs_migration" && <p className="msg-error" role="status">Нужна миграция 0012 (очередь задач).</p>}
+          <section className="panel" aria-labelledby="state-h">
+            <h2 id="state-h">Ваше состояние: {STATE_LABEL[ms.state]}</h2>
+            <p className="hint">{STATE_HELP[ms.state]}{ms.untilAt ? ` Действует до ${formatLocal(new Date(ms.untilAt).getTime(), "ru")}.` : ""} «Срочно» от клиента, даже от VIP, ваше состояние не меняет: срочность подтверждаете только вы.</p>
+            <form action={saveMasterState} className="row">
+              <label>Состояние <select name="state" defaultValue={ms.state}>{MASTER_STATES.map((k) => <option key={k} value={k}>{STATE_LABEL[k]}</option>)}</select></label>
+              <label>Сколько минут (необязательно) <input name="minutes" type="number" min={0} max={720} placeholder="например, 90" /></label>
+              <button className="btn btn-secondary btn-sm" type="submit">Сохранить</button>
+            </form>
+          </section>
           <section className="panel" aria-labelledby="brief-h">
             <h2 id="brief-h">Сводка на завтра: {brief.label}</h2>
             {brief.visits.length === 0 ? <p className="hint">Записей нет.</p> : (

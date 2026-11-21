@@ -1,3 +1,4 @@
+import { isMasterBusy } from "./master-state";
 import { getPolicies } from "./policies";
 import { addToWaitlist } from "./waitlist";
 import { HELLO, addAiNote, clientContext } from "./client-context";
@@ -197,7 +198,7 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
     if (who && (await isVip(db, p.tenantId, who.clientId)) && (await requestVipUrgent(db, p.tenantId, who.clientId, text.slice(0, 300)))) {
       handoffId = await handoff(db, p.tenantId, conv.id, "vip_urgent", text);
       tools.push({ tool: "requestHandoff", ok: true, detail: "vip_urgent" });
-      const msg = (await getPolicies(db, p.tenantId)).values.master_busy ? `${T.vipUrgent[locale]} ${T.busy[locale]}` : T.vipUrgent[locale];
+      const msg = (await isMasterBusy(db, p.tenantId)) ? `${T.vipUrgent[locale]} ${T.busy[locale]}` : T.vipUrgent[locale];
       await db.run("INSERT INTO messages(id,conversation_id,role,content,knowledge_version,meta,created_at) VALUES (?1,?2,'assistant',?3,?4,?5,?6)", [uuid(), conv.id, msg, kbv.version, js({ intents: ["booking"], citations, tools, engine }), nowIso()]);
       return { message: msg, locale, intent: "booking", knowledgeVersion: kbv.version, citations, requiresHuman: true, handoffId, toolResults: tools, engine };
     }
@@ -287,7 +288,7 @@ export async function handleMessage(db: Db, p: { tenantId: string; conversationI
     }
   }
 
-  if (requiresHuman && (await getPolicies(db, p.tenantId)).values.master_busy) parts.push(T.busy[locale]);
+  if (requiresHuman && (await isMasterBusy(db, p.tenantId))) parts.push(T.busy[locale]);
   const hello = await greetOnce(db, p.tenantId, conv.id, locale, p.now);
   if (hello) { parts.unshift(hello); tools.push({ tool: "recognizeClient", ok: true, detail: "greeted" }); recognized = true; }
   const message = parts.join("\n\n");
