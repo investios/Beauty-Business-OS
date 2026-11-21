@@ -31,6 +31,7 @@ export default function Marketing() {
           <section><h2>Откуда приходят записи</h2>
             {src.length === 0 ? <p>Данных пока нет.</p> : <div className="tbl-wrap"><table><thead><tr><th>Источник</th><th>Кампания</th><th>Записей</th></tr></thead><tbody>{src.map((r, i) => <tr key={i}><td>{r.src_name}</td><td>{r.campaign}</td><td>{r.leads}</td></tr>)}</tbody></table></div>}
           </section>
+          <section><h2>Сценарии общения</h2><p className="hint">30 готовых черновиков писем и ответов на трёх языках. Здесь вы их читаете и утверждаете.</p><a className="btn btn-secondary btn-sm" href="/owner/scripts">Открыть сценарии</a></section>
           <section><h2>Четыре автоматизации</h2>
             <p className="warnbox" style={{ marginBottom: 12 }}>Сейчас переключатель только сохраняет ваше решение. Реальные сообщения не отправляются: почта, SMS и мессенджеры не подключены, а согласия клиентов ещё не собираются в боевом режиме.</p>
             <div className="list">{autos.map((a) => (

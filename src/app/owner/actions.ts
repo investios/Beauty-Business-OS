@@ -361,3 +361,11 @@ export async function saveMasterState(fd: FormData) {
   revalidatePath("/owner/today"); revalidatePath("/owner/ai");
   redirect("/owner/today?m=state");
 }
+
+export async function decidePlaybook(fd: FormData) {
+  const { tenantId, db } = await guard();
+  const { setApproval } = await import("@/lib/playbooks");
+  await setApproval(db, tenantId, String(fd.get("id") ?? ""), fd.get("decision") === "approve");
+  revalidatePath("/owner/scripts");
+  redirect("/owner/scripts?m=ok");
+}
