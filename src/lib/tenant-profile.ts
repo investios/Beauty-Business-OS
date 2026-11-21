@@ -16,6 +16,9 @@ export type Profile = {
 /** Пока профиль не заполнен, тексты говорят нейтрально («мастер»), а не чужим именем */
 export const NEUTRAL: Profile = { masterName: "", masterNameLatin: "", studioName: "", city: "", addressForm: "vy", tone: "warm", forms: {}, about: "", referencePack: "", configured: false };
 
+/** Переходное значение: пока миграция 0017 не применена в боевой базе, единственный живой салон (студия Милы) продолжает работать как раньше. Удалить после подтверждения миграции. */
+const LEGACY_UNTIL_MIGRATED: Profile = { ...NEUTRAL, masterName: "Мила", masterNameLatin: "Mila", studioName: "MK Extension Studio by Mila", city: "Дублин", referencePack: "mk-extension-studio", configured: true };
+
 const clean = (v: unknown, max: number) => String(v ?? "").replace(/[<>{}[\]\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 
 export async function getProfile(db: Db, tenantId: string): Promise<Profile> {
@@ -28,7 +31,7 @@ export async function getProfile(db: Db, tenantId: string): Promise<Profile> {
       masterName: r.master_name, masterNameLatin: r.master_name_latin, studioName: r.studio_name, city: r.city,
       addressForm: r.address_form === "ty" ? "ty" : "vy", tone: (r.tone in TONES ? r.tone : "warm") as Tone, forms, about: r.about, referencePack: r.reference_pack ?? "", configured: !!r.master_name,
     };
-  } catch { return NEUTRAL; } // таблицы ещё нет (миграция не применена)
+  } catch { return LEGACY_UNTIL_MIGRATED; } // таблицы ещё нет: миграция 0017 не применена
 }
 
 export async function saveProfile(db: Db, tenantId: string, i: Record<string, unknown>, by = "owner"): Promise<{ ok: boolean; reason?: string }> {
