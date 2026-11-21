@@ -79,3 +79,30 @@ export async function consultantTenant() {
   if (!s) return null;
   return one<{ id: string; name: string }>(await getDb(), "SELECT id,name FROM tenants WHERE id=?1", [s.tenantId]);
 }
+
+/* ---------- Платформа (владелец системы): отдельный вход, отдельная кука и пароль. Видит все салоны и всё содержимое. ---------- */
+export const PLATFORM_COOKIE = "platform_session";
+/** Пароль из секрета PLATFORM_PASSWORD. В боевой среде без него панель выключена (404). */
+export function platformPassword(): string | null {
+  const p = process.env.PLATFORM_PASSWORD;
+  if (p) return p;
+  return process.env.NODE_ENV === "production" ? null : "demo-platform";
+}
+const psign = (v: string) => createHmac("sha256", secret()).update(`platform:${v}`).digest("base64url");
+export function makePlatformSession(): string {
+  const body = Buffer.from(JSON.stringify({ r: "platform", exp: Date.now() + TTL_MS })).toString("base64url");
+  return `${body}.${psign(body)}`;
+}
+export function readPlatformSession(token: string | undefined): boolean {
+  if (!token) return false;
+  const [body, sig] = token.split(".");
+  if (!body || !sig || !safeEqual(sig, psign(body))) return false;
+  try {
+    const p = JSON.parse(Buffer.from(body, "base64url").toString());
+    return p.r === "platform" && typeof p.exp === "number" && p.exp >= Date.now();
+  } catch { return false; }
+}
+export async function platformAuthorized(): Promise<boolean> {
+  if (!platformPassword()) return false;
+  return readPlatformSession((await cookies()).get(PLATFORM_COOKIE)?.value);
+}
