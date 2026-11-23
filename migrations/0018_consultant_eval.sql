@@ -12,3 +12,4 @@ CREATE TABLE IF NOT EXISTS consultant_eval (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_consultant_eval ON consultant_eval(tenant_id, run_id, created_at);
+-- применено автоматически через GitHub Actions
