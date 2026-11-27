@@ -1,7 +1,8 @@
 import OwnerShell from "@/components/OwnerShell";
 import { getDb, rows } from "@/lib/db";
 import { formatLocal } from "@/lib/tz";
-import { activateVersion, approveDraft, publishVersion, replyHandoff, resolveHandoff, saveDraft, decideVip } from "../actions";
+import { activateVersion, approveDraft, publishVersion, replyHandoff, resolveHandoff, saveDraft, decideVip, replyAndRemember, rememberOnly } from "../actions";
+import { groupQuestions, LESSON_TOPICS } from "@/lib/lessons";
 import { isMasterBusy } from "@/lib/master-state";
 import { getPolicies } from "@/lib/policies";
 import { vipRequests } from "@/lib/loyalty";
@@ -20,22 +21,26 @@ export default async function AiPage({ searchParams }: { searchParams: Promise<{
         const hs = await rows<{ id: string; reason: string; summary: string; contact: string | null; status: string; created_at: string; channel: string | null }>(db, "SELECT id,reason,summary,contact,status,created_at,(SELECT channel FROM conversations c WHERE c.id=handoffs.conversation_id) channel FROM handoffs WHERE tenant_id=?1 ORDER BY (status='open') DESC, created_at DESC LIMIT 30", [t.id]);
         const arts = await rows<{ id: string; key: string; locale: string; title: string; answer: string; draft_answer: string | null; approved_by: string | null }>(db, "SELECT id,key,locale,title,answer,draft_answer,approved_by FROM knowledge_articles WHERE tenant_id=?1 ORDER BY key, locale", [t.id]);
         const vs = await rows<{ version: number; approved_by: string; active: boolean; created_at: string }>(db, "SELECT version,approved_by,active,created_at FROM knowledge_versions WHERE tenant_id=?1 ORDER BY version DESC", [t.id]);
+        const groups = groupQuestions(hs.filter((h) => h.status === "open" && h.contact === null && h.channel !== "manage"));
         const keys = [...new Set(arts.map((a) => a.key))];
         const drafts = arts.filter((a) => a.draft_answer).length;
         return (<>
           <h1>ИИ и вопросы</h1>
           {m === "replied" && <p className="msg-ok" role="status">Ответ отправлен в чат клиента. Если клиент закрыл чат, он увидит его при следующем открытии.</p>}
+          {m === "lesson" && <p className="msg-ok" role="status">Сохранено черновиком в «Что знает ИИ». Клиентам это попадёт после «Утвердить» и «Опубликовать версию».</p>}
+          {m === "lesson_long" && <p className="msg-error" role="status">В этой теме уже много текста (лимит 2000 знаков). Сократите её в «Что знает ИИ» или выберите другую тему.</p>}
           {m === "bad" && <p className="msg-error" role="status">Напишите текст ответа</p>}
           {busy && <p className="warnbox">Включён режим «мастер занят»: ИИ предупреждает клиентов, что вы ответите позже. Выключить можно в <a href="/owner/settings">Настройках</a>.</p>}
           <section><h2>Вопросы, которые ИИ передал вам</h2>
             {hs.length === 0 && <p>Пока нет.</p>}
-            <div className="list">{hs.map((h) => (
+            {groups.length > 0 && <div className="panel" style={{ marginBottom: 16 }}><h3 style={{ marginTop: 0 }}>Вопросы без контакта: что спрашивают чаще</h3><p className="hint">Клиент не оставил контакт, отвечать некому. Но вопрос полезен: напишите, как ИИ должен отвечать, и он попадёт в черновик знаний.</p><div className="list">{groups.map((g) => (<div key={g.key} className="item"><div className="top"><span>{g.sample}</span><span className="badge warn">{g.count > 1 ? `спрашивали ${g.count} раз` : "1 раз"}</span></div><form action={rememberOnly} className="sched-set"><input type="hidden" name="ids" value={g.ids.join(",")} /><input type="hidden" name="q" value={g.sample} /><label className="field"><span>Как ИИ должен отвечать</span><textarea name="text" rows={3} maxLength={700} required /></label><label className="field"><span>К какой теме</span><select name="topic">{Object.entries(LESSON_TOPICS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label><div className="row"><button className="btn btn-primary btn-sm" type="submit">Запомнить для ИИ</button></div></form><form action={resolveHandoff}><input type="hidden" name="ids" value={g.ids.join(",")} /><input type="hidden" name="id" value={g.ids[0]} /><button className="btn btn-secondary btn-sm" type="submit">Не нужно, убрать</button></form></div>))}</div></div>}
+            <div className="list">{hs.filter((h) => !(h.status === "open" && h.contact === null && h.channel !== "manage")).map((h) => (
               <div key={h.id} className="item">
                 <div className="top"><span>{REASON[h.reason] ?? h.reason}</span><span className={`badge ${h.status === "open" ? "warn" : "ok"}`}>{h.status === "open" ? "ждёт ответа" : "закрыто"}</span></div>
                 <small>{h.summary}</small>
                 <small>Контакт: {h.contact ?? "клиент пока не оставил"} · {formatLocal(new Date(h.created_at).getTime(), "ru")}</small>
                 {h.status === "open" && h.channel === "manage" && <small className="hint">Клиент написал со страницы записи, чата у него нет: ответьте по контакту выше (почта или телефон), затем отметьте вопрос решённым.</small>}
-                {h.status === "open" && h.channel !== "manage" && <form action={replyHandoff} className="sched-set"><input type="hidden" name="id" value={h.id} /><label className="field"><span>Ответ клиенту в чат</span><textarea name="text" rows={2} maxLength={1500} required /></label><div className="row"><button className="btn btn-primary btn-sm" type="submit">Отправить ответ</button></div></form>}
+                {h.status === "open" && h.channel !== "manage" && <form action={replyHandoff} className="sched-set"><input type="hidden" name="id" value={h.id} /><label className="field"><span>Ответ клиенту в чат</span><textarea name="text" rows={2} maxLength={1500} required /></label><input type="hidden" name="q" value={h.summary} /><label className="field"><span>Если хотите, чтобы ИИ запомнил этот ответ: тема</span><select name="topic">{Object.entries(LESSON_TOPICS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label><div className="row"><button className="btn btn-primary btn-sm" type="submit">Отправить ответ</button><button className="btn btn-secondary btn-sm" type="submit" formAction={replyAndRemember}>Отправить и запомнить для ИИ</button></div></form>}
                 {h.status === "open" && <form action={resolveHandoff}><input type="hidden" name="id" value={h.id} /><button className="btn btn-secondary btn-sm" type="submit">Отметить как решённый</button></form>}
               </div>))}</div>
           </section>

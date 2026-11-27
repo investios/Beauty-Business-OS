@@ -22,8 +22,9 @@ export async function toggleAutomation(fd: FormData) {
 }
 export async function resolveHandoff(fd: FormData) {
   const { tenantId, db } = await guard();
-  await db.run("UPDATE handoffs SET status='resolved' WHERE id=?1 AND tenant_id=?2", [String(fd.get("id")), tenantId]);
-  await audit(db, tenantId, "owner", "handoff.resolve", String(fd.get("id")));
+  const ids = String(fd.get("ids") ?? fd.get("id")).split(",").filter((x) => /^[0-9a-f-]{36}$/.test(x));
+  for (const id of ids.slice(0, 200)) await db.run("UPDATE handoffs SET status='resolved' WHERE id=?1 AND tenant_id=?2", [id, tenantId]);
+  await audit(db, tenantId, "owner", "handoff.resolve", ids[0] ?? "", { n: ids.length });
   revalidatePath("/owner/ai");
 }
 export async function saveDraft(fd: FormData) {
@@ -389,3 +390,20 @@ export async function saveServiceRebookAction(fd: FormData) {
   revalidatePath("/owner/settings");
   redirect(`/owner/settings?m=saved&n=${r.saved}&bad=${r.bad}`);
 }
+
+/** Запомнить ответ для ИИ (в черновик темы). mode: reply = ещё и отправить клиенту; many = группа вопросов без контакта */
+async function lesson(fd: FormData, reply: boolean) {
+  const { tenantId, db } = await guard();
+  const { rememberForAi, resolveMany } = await import("@/lib/lessons");
+  const ids = String(fd.get("ids") ?? fd.get("id") ?? "").split(",").filter((x) => /^[0-9a-f-]{36}$/.test(x));
+  const text = String(fd.get("text") ?? "");
+  let res: string = await rememberForAi(db, tenantId, String(fd.get("topic")), String(fd.get("q") ?? ""), text, "owner");
+  if (res === "ok") {
+    if (reply && ids[0]) { const { replyToHandoff } = await import("@/lib/master-replies"); await replyToHandoff(db, tenantId, ids[0], text, "owner"); }
+    else await resolveMany(db, tenantId, ids);
+  }
+  revalidatePath("/owner/ai");
+  redirect(`/owner/ai?m=${res === "ok" ? "lesson" : res === "too_long" ? "lesson_long" : "bad"}`);
+}
+export async function replyAndRemember(fd: FormData) { await lesson(fd, true); }
+export async function rememberOnly(fd: FormData) { await lesson(fd, false); }
