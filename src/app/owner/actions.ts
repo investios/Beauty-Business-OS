@@ -377,3 +377,15 @@ export async function saveTenantProfile(fd: FormData) {
   revalidatePath("/owner/settings"); revalidatePath("/owner/scripts");
   redirect(`/owner/settings?m=${r.ok ? "profile" : r.reason === "migration" ? "profile_migration" : "profile_bad"}`);
 }
+
+/** Срок повторного визита по услугам */
+export async function saveServiceRebookAction(fd: FormData) {
+  const { tenantId, db } = await guard();
+  const { saveServiceRebook } = await import("@/lib/service-rebook");
+  const values: Record<string, string> = {};
+  for (const [k, v] of fd.entries()) if (k.startsWith("svc_")) values[k.slice(4)] = String(v);
+  let r = { saved: 0, bad: 0 };
+  try { r = await saveServiceRebook(db, tenantId, values, "owner"); } catch { redirect("/owner/settings?m=migration"); }
+  revalidatePath("/owner/settings");
+  redirect(`/owner/settings?m=saved&n=${r.saved}&bad=${r.bad}`);
+}

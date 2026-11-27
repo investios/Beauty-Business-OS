@@ -2,6 +2,8 @@ import OwnerShell from "@/components/OwnerShell";
 import { getDb, rows } from "@/lib/db";
 import { POLICY_DEFS, POLICY_KEYS, getPolicies, policyHistory } from "@/lib/policies";
 import { savePolicies, setBufferAll, saveTenantProfile } from "../actions";
+import { getServiceRebook } from "@/lib/service-rebook";
+import { saveServiceRebookAction } from "../actions";
 import { getProfile, TONES } from "@/lib/tenant-profile";
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         const pol = await getPolicies(db, t.id);
         const prof = await getProfile(db, t.id);
         const hist = await policyHistory(db, t.id, 20);
+        const svcs = await rows<{ id: string; title_i18n: Record<string, string> | string }>(db, "SELECT id,title_i18n FROM services WHERE tenant_id=?1 AND active=1 ORDER BY title_i18n", [t.id]);
+        const perSvc = await getServiceRebook(db, t.id);
         const bufs = await rows<{ buffer_min: number; n: number }>(db, "SELECT buffer_min, COUNT(*) AS n FROM services WHERE tenant_id=?1 AND active=1 GROUP BY buffer_min", [t.id]);
         const msg: [boolean, string] | undefined =
           sp.m === "saved" ? [true, Number(sp.n) ? `Сохранено изменений: ${sp.n}. Действует для новых записей; уже созданные сохраняют условия, на которые клиент согласился.` : "Изменений нет."]
@@ -60,6 +64,17 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                   : <label className="field" key={k}><span>{d.label} ({d.unit})</span><input type="number" name={k} defaultValue={v} min={d.min} max={d.max} step={1} inputMode="numeric" /><small className="hint">{d.hint}</small></label>;
               })}
               <div className="row"><button className="btn btn-primary" type="submit" disabled={!pol.persisted}>Сохранить</button></div>
+            </form>
+          </section>
+          <section className="panel">
+            <h2>Повторный визит по услугам</h2>
+            <p className="hint" style={{ marginTop: 0 }}>Через сколько дней после услуги предлагать записаться снова. По этому сроку же считается статус клиента («пора записаться», «давно не были»). Пустое поле: берётся общее число выше ({pol.values.rebook_after_days} дн). Например, наращивание около 90 дней, стрижка около 20. Эти числа решаете вы.</p>
+            <form action={saveServiceRebookAction} className="sched-set">
+              {svcs.map((s) => {
+                const title = typeof s.title_i18n === "string" ? (() => { try { return JSON.parse(s.title_i18n).ru ?? s.id; } catch { return s.id; } })() : (s.title_i18n.ru ?? s.title_i18n.en ?? s.id);
+                return <label className="field" key={s.id}><span>{title} (дн)</span><input type="number" name={`svc_${s.id}`} defaultValue={perSvc.get(s.id) ?? ""} placeholder={String(pol.values.rebook_after_days)} min={7} max={365} step={1} inputMode="numeric" /></label>;
+              })}
+              <div className="row"><button className="btn btn-primary" type="submit">Сохранить сроки</button></div>
             </form>
           </section>
           <section className="panel">

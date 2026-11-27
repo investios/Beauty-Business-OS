@@ -46,7 +46,7 @@ export default async function AiPage({ searchParams }: { searchParams: Promise<{
           <section><h2>Что знает ИИ</h2>
             <p className="warnbox" style={{ marginBottom: 12 }}>ИИ отвечает только по опубликованной версии. Сейчас тексты — нейтральные заглушки, мастер их ещё не утвердил. Правка попадает к клиентам только после «Утвердить» и «Опубликовать версию»{drafts ? ` (черновиков: ${drafts})` : ""}.</p>
             <div className="list">{keys.map((k) => (
-              <details key={k}><summary>{arts.find((a) => a.key === k)!.title} ({k})</summary>
+              <details key={k}><summary>{({ consultation: "Консультация", extensions: "Наращивание волос", preparation: "Подготовка к визиту", price: "Цены", technique: "Своя техника мастера" } as Record<string, string>)[k] ?? arts.find((a) => a.key === k)!.title}</summary>
                 <div style={{ padding: "0 16px 16px", display: "grid", gap: 14 }}>
                   {arts.filter((a) => a.key === k).map((a) => (
                     <form key={a.id} action={saveDraft} style={{ display: "grid", gap: 8 }}>

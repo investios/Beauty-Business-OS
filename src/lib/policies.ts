@@ -21,7 +21,7 @@ export const POLICY_DEFS: Record<PolicyKey, Def> = {
   vip_reserve_pct: { label: "Резерв времени для VIP, % свободных окон в день", hint: "0 выключает. Скрыто от обычной записи, видно только вам. Рекомендуется 10", kind: "int", def: 0, min: 0, max: 50, unit: "%" },
   vip_release_hours: { label: "Освобождать резерв за", hint: "Окна резерва снова становятся доступны всем за столько часов до визита", kind: "int", def: 48, min: 1, max: 168, unit: "ч" },
   brief_hour: { label: "Вечерняя сводка на завтра: во сколько собирать", hint: "Час по Дублину (15–23). Сводка собирается и лежит в «Обзоре». Наружу пока не отправляется", kind: "int", def: 19, min: 15, max: 23, unit: "ч" },
-  rebook_after_days: { label: "Предложить повторный визит через", hint: "Только клиентам с согласием на предложения. Значение тестовое, уточняется по каждой услуге", kind: "int", def: 28, min: 7, max: 365, unit: "дн" },
+  rebook_after_days: { label: "Повторный визит по умолчанию, через", hint: "Для услуг, у которых срок не задан отдельно (ниже). Предложение уходит только клиентам с согласием", kind: "int", def: 28, min: 7, max: 365, unit: "дн" },
 };
 export const POLICY_KEYS = Object.keys(POLICY_DEFS) as PolicyKey[];
 export type Policies = Record<PolicyKey, number>;

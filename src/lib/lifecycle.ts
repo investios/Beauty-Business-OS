@@ -1,3 +1,4 @@
+import { getServiceRebook, rebookDays } from "@/lib/service-rebook";
 import { nowIso, one, rows, uuid, auditStmt, type Db } from "./db";
 import { deliverEmail } from "./notify";
 import { SITE_URL } from "./seo";
@@ -39,12 +40,13 @@ export async function planLifecycle(db: Db, tenantId: string, o: RunOpts): Promi
   await db.run(`UPDATE notifications SET status='cancelled' WHERE tenant_id=?1 AND status='queued' AND kind IN (${KINDS_SQL})
     AND appointment_id IN (SELECT id FROM appointments WHERE tenant_id=?1 AND status IN ('cancelled','no_show','held'))`, [tenantId]);
   const done = o.assumeVisits ? "('completed','confirmed')" : "('completed')";
-  const appts = await rows<{ id: string; end_at: string }>(db, `SELECT id,end_at FROM appointments WHERE tenant_id=?1 AND client_id IS NOT NULL AND status IN ${done} AND end_at <= ?2 AND end_at > ?3`,
+  const appts = await rows<{ id: string; end_at: string; service_id: string }>(db, `SELECT id,end_at,service_id FROM appointments WHERE tenant_id=?1 AND client_id IS NOT NULL AND status IN ${done} AND end_at <= ?2 AND end_at > ?3`,
     [tenantId, o.assumeVisits ? new Date(o.nowMs + 40 * 86400000).toISOString() : now, new Date(o.nowMs - 90 * 86400000).toISOString()]);
   let n = 0;
   const pol = (await getPolicies(db, tenantId)).values;
+  const perSvc = await getServiceRebook(db, tenantId);
   for (const a of appts) {
-    for (const [kind, due] of [["followup", startMs(a.end_at) + pol.followup_after_hours * 3600000], ["rebook", startMs(a.end_at) + pol.rebook_after_days * 86400000]] as const) {
+    for (const [kind, due] of [["followup", startMs(a.end_at) + pol.followup_after_hours * 3600000], ["rebook", startMs(a.end_at) + rebookDays(perSvc, a.service_id, pol.rebook_after_days) * 86400000]] as const) {
       const r = await db.run(`INSERT INTO notifications(id,tenant_id,appointment_id,kind,status,scheduled_for,created_at)
         SELECT ?1,?2,?3,?4,'queued',?5,?6 WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE appointment_id=?3 AND kind=?4 AND status<>'cancelled')`,
         [uuid(), tenantId, a.id, kind, new Date(toSendWindow(due)).toISOString(), now]);

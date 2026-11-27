@@ -1,3 +1,4 @@
+import { getServiceRebook, rebookDays } from "@/lib/service-rebook";
 import { auditStmt, nowIso, one, rows, uuid, type Db } from "./db";
 import { getPolicies } from "./policies";
 
@@ -32,17 +33,19 @@ export function computeStatus(p: { lastVisit: string | null; hasUpcoming: boolea
 export async function refreshClientStatuses(db: Db, tenantId: string, now = new Date()): Promise<{ changed: number; persisted: boolean }> {
   try {
     const interval = (await getPolicies(db, tenantId)).values.rebook_after_days;
-    const list = await rows<{ id: string; created_at: string; last_visit: string | null; upcoming: number; status: string | null; manual: number | null; st_at: string | null }>(db,
+    const perSvc = await getServiceRebook(db, tenantId);
+    const list = await rows<{ id: string; created_at: string; last_visit: string | null; upcoming: number; last_service: string | null; status: string | null; manual: number | null; st_at: string | null }>(db,
       `SELECT c.id,c.created_at,
         (SELECT max(a.start_at) FROM appointments a WHERE a.client_id=c.id AND a.status='completed') last_visit,
         (SELECT count(*) FROM appointments a WHERE a.client_id=c.id AND a.status='confirmed' AND a.start_at>?2) upcoming,
+        (SELECT a.service_id FROM appointments a WHERE a.client_id=c.id AND a.status='completed' ORDER BY a.start_at DESC LIMIT 1) last_service,
         s.status,s.manual,s.status_updated_at st_at
        FROM clients c LEFT JOIN client_state s ON s.client_id=c.id WHERE c.tenant_id=?1`, [tenantId, now.toISOString()]);
     let changed = 0; const at = nowIso(); const st: { sql: string; params: (string | number | null)[] }[] = [];
     for (const c of list) {
       const visitedAfterManual = c.manual && c.last_visit && c.st_at && c.last_visit > c.st_at;
       if (c.manual && !visitedAfterManual) continue;
-      const next = computeStatus({ lastVisit: c.last_visit, hasUpcoming: c.upcoming > 0, intervalDays: interval, now, createdAt: c.created_at });
+      const next = computeStatus({ lastVisit: c.last_visit, hasUpcoming: c.upcoming > 0, intervalDays: rebookDays(perSvc, c.last_service, interval), now, createdAt: c.created_at });
       if (c.status === next && !c.manual) continue;
       changed++;
       st.push({ sql: "INSERT INTO client_state(client_id,tenant_id,status,manual,status_updated_at) VALUES (?1,?2,?3,0,?4) ON CONFLICT(client_id) DO UPDATE SET status=?3,manual=0,status_updated_at=?4", params: [c.id, tenantId, next, at] });
