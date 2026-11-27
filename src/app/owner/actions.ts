@@ -407,3 +407,18 @@ async function lesson(fd: FormData, reply: boolean) {
 }
 export async function replyAndRemember(fd: FormData) { await lesson(fd, true); }
 export async function rememberOnly(fd: FormData) { await lesson(fd, false); }
+
+/** Каталог услуг: добавить или изменить */
+export async function saveServiceAction(fd: FormData) {
+  const { tenantId, db } = await guard();
+  const { saveService } = await import("@/lib/service-catalog");
+  const g = (k: string) => String(fd.get(k) ?? "");
+  const r = await saveService(db, tenantId, {
+    id: g("id") || undefined,
+    title: { ru: g("title_ru"), en: g("title_en"), uk: g("title_uk") },
+    desc: { ru: g("desc_ru"), en: g("desc_en"), uk: g("desc_uk") },
+    duration_min: Number(g("duration")), price_mode: g("price_mode") as "from", price_eur: g("price"), active: fd.get("active") === "on",
+  }, "owner");
+  revalidatePath("/owner/services"); revalidatePath("/");
+  redirect(`/owner/services?m=${r}`);
+}

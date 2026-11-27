@@ -4,6 +4,7 @@ import { getDb, one } from "@/lib/db";
 import { formatLocal, localParts } from "@/lib/tz";
 import { cancelAppt, rescheduleAppt, setApptStatus } from "../../actions";
 import { STATUS } from "@/lib/owner-ui";
+import { balance } from "@/lib/loyalty";
 export const dynamic = "force-dynamic";
 
 const MSG: Record<string, [boolean, string]> = {
@@ -25,6 +26,7 @@ export default async function Appointment({ params, searchParams }: { params: Pr
           `SELECT a.id,a.status,a.start_at,a.end_at,a.created_at,a.source,a.confirmation_delivery_status delivery,c.id client_id,c.name,c.contact,s.title_i18n,s.duration_min
            FROM appointments a JOIN clients c ON c.id=a.client_id JOIN services s ON s.id=a.service_id WHERE a.id=?1 AND a.tenant_id=?2`, [id, t.id]);
         if (!a) notFound();
+        const bal = await balance(db, t.id, a.client_id);
         const st = STATUS[a.status] ?? [a.status, ""];
         const lp = localParts(new Date(a.start_at).getTime());
         const day = `${lp.y}-${String(lp.mo).padStart(2, "0")}-${String(lp.d).padStart(2, "0")}`, time = `${String(lp.h).padStart(2, "0")}:${String(lp.mi).padStart(2, "0")}`;
@@ -41,6 +43,7 @@ export default async function Appointment({ params, searchParams }: { params: Pr
               <div><dt>Услуга</dt><dd>{a.title_i18n.ru}</dd></div>
               <div><dt>Контакт</dt><dd>{a.contact}</dd></div>
               <div><dt>Источник</dt><dd>{a.source.utm_source ?? a.source.channel ?? "прямой заход"}{a.source.utm_campaign ? ` / ${a.source.utm_campaign}` : ""}</dd></div>
+              <div><dt>Бонусы клиента</dt><dd>{`€${Math.trunc(bal / 100)}.${String(bal % 100).padStart(2, "0")}`}{bal > 0 ? <> · <a className="link-ul" href={`/owner/clients/${a.client_id}#bonus`}>списать в карточке</a></> : ""}</dd></div>
               <div><dt>Создана</dt><dd>{formatLocal(new Date(a.created_at).getTime(), "ru")}</dd></div>
               <div><dt>Письмо клиенту</dt><dd>{a.delivery === "not_configured" ? "почта ещё не подключена, письмо не отправлялось" : a.delivery}</dd></div>
             </dl>

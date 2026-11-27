@@ -71,7 +71,7 @@ export default async function Client({ params, searchParams }: { params: Promise
             </form>
             {hist.length > 0 && <details><summary>История статусов</summary><ul className="plain">{hist.map((h, i) => <li key={i}>{fmtD(h.created_at)}: {STATUS_LABEL[h.status as ClientStatus] ?? h.status} · {h.reason} ({h.changed_by === "system" ? "система" : "мастер"})</li>)}</ul></details>}
           </section>
-          <section className="panel">
+          <section className="panel" id="bonus">
             <h2>Бонусы и VIP</h2>
             <p>Баланс: <b>{money(bal)}</b> <small className="hint">Все размеры бонусов сейчас тестовые: решение о реальных условиях за вами.</small></p>
             {code && <p className="hint">Код приглашения: <b>{code}</b> · ссылка для друга: /ru?ref={code}. Награда начисляется только после того, как друг придёт на визит.</p>}
